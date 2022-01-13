@@ -1,0 +1,72 @@
+---
+title: "Többváltozós adatelemzési modellek"
+author: |-
+  Jónás Balázs
+  K377FK
+date: "1/11/2022"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Probléma felvetése
+Célom a magyar államkötvények elsődleges kibocsátásának vizsgálata.
+
+## Adatok forrása és feldolgozása
+Forrás: https://akk.hu/statistics/government-securities/main-features-government-securities
+Elérés: 2022. január 10 du. 5:39
+A táblázat a magyar államkötvények aukciók tartalmazza 1987-től. A tábla 21 ismérvet és 3758 megfigyelést tartalmaz.
+
+
+## Adatok jellemzése
+
+### Type 
+Nominális tipus. Lehetséges értékei:
+
+* ISSUE (elsődleges kibocsátás)
+* BUYBACK (visszavásárlási aukció)
+* SUBSCRIPTION (jegyzés)
+* NON_COMPETITIVE (aukciót követően az ott kialakult árfolyamon lejegyzett államkötvények)
+* TAP_ISSUE (rábocsátás)
+* SWITCH (csereaukció)
+
+A dolgozatban csak az elsődleges kibocsátások (ISSUE) ismérveit fogom vizsgálni.
+
+
+### Tenor
+Ordinális tipus, mely a kötvény futamidejét jelöli hónapokban vagy években. A kötvény tipusától függően különböző jelölést használtak az 1 éves referencia papír esetén: diszkont kincstárjegy esetén "12M", államkötvény esetén az "1Y" jelölést használták. Az adattisztítás során egységes "1Y"-ra cseréltem.
+
+### Security Type
+Nominális tipus, amely a kötvény típusát jelöli.
+
+|Oszlop neve|Tipusa|Jelentése|Értékkészlete|
+| --- | ----------- |-- | 
+|Type|Nominális|Tranzakció típusa|pl elsődleges kibocsátás, visszavásárlás
+|Tenor|Ordinális|Referencia lejárat|
+|Security|Nominális|Kötvény típusa|Kötvény, diszkont kincstárjegy vagy lakossági papír
+
+
+# Megszorítások
+Csak az elsődleges kibocsátásokat veszem figyelembe
+Nem veszem figyelembe a lakossági állampapírokat, mivel ezek értékesítése nem piaci alapot történik, nem tükrözi a magyar állammal szembeni ??
+Devizát sem, 
+  Devizaárfolyam, valamit az adott devizához tartozó referencia papírnak tekintett állampapírok (pl dollár esetén USA, euró esetén a német állam által kibocsátott kötvények) ismerete nélkül kevés információt szolgáltat.
+Csereaukciók: nem jut új forráshoz az állam, mind a vevő, mind az eladó részéről elsősorban kockázatkezelési célokat szolgál.
+
+visszavásárlások: Ebben az esetben az állam vevő szerepében jelenik meg, gyakran a lejáratok előtt több részletben vásárolnak vissza kötvényeket
+
+Abban az esetben, ha egy aukció eredménytelen volt, a hozam értéke nem értelmezhető.
+
+A táblázat tartalmaz egy hibát, amit javítottam
+
+
+# TODO
+hiba javítása
+csak fix
+
+hosszabb futamidejű kötvények hozama magasabb
+
