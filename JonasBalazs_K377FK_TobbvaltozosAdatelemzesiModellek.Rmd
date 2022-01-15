@@ -24,7 +24,7 @@ A táblázat a magyar államkötvények aukciók tartalmazza 1987-től. A tábla
 
 ## Adatok jellemzése
 
-### Type 
+### Type
 Nominális tipus. Lehetséges értékei:
 
 * ISSUE (elsődleges kibocsátás)
@@ -40,8 +40,44 @@ A dolgozatban csak az elsődleges kibocsátások (ISSUE) ismérveit fogom vizsg�
 ### Tenor
 Ordinális tipus, mely a kötvény futamidejét jelöli hónapokban vagy években. A kötvény tipusától függően különböző jelölést használtak az 1 éves referencia papír esetén: diszkont kincstárjegy esetén "12M", államkötvény esetén az "1Y" jelölést használták. Az adattisztítás során egységes "1Y"-ra cseréltem.
 
+Fontos megjegyezni, hogy ebben az esetben a különbség nem értelmezhető, ezért nem tekinthető intervallum típusnak.
+####### TODO: range 3M - 20Y
+<!-- #példa: -->
+<!-- # Type	Tenor	Security Type	Alias	Date	Settlement	Interest Type	Announced (mln)	Maturity Date -->
+<!-- # ISSUE	10Y	KTV	2013/D	2003.05.15	2003.05.22	Fix	30,000.00	2013.02.12 -->
+<!-- #ISSUE	3Y	KTV	2013/D	2009.05.07	2009.05.13	Fix	5,000.00	2013.02.12 -->
+
+
 ### Security Type
-Nominális tipus, amely a kötvény típusát jelöli.
+Nominális típus, amely a kötvény típusát jelöli.
+
+
+### Alias
+Nominális típus. A kötvény rövid neve.
+
+### Date
+Intervallum típus. Az aukció dátuma.
+
+### Settlement
+Intervallum típus. Az elszámolás napja.
+
+### Maturity Date
+Intervallum típus. A kötvény lejáratának napja.
+
+### Interest Type
+Nominális típus. Diszkont, fix vagy változó kamatozású kötvény.
+
+### Kötvények keresletére vonatkozó adatok
+Arány típusú ismérvek, melyek meghirdetett, benyújtott és elfogadott mennyiség : Announced (mln), Bid Amount (mln) és Accepted (mln)
+
+### Kötvények hozamára vonatkozó adatok
+Arány típusú ismérvek. Az adott kötvényre benyújtott ajánlatok hozamainak minimuma, maximuma és átlaga százalékban.
+
+### Kötvények árfolyamára vonatkozó adatok
+Arány típusú ismérvek. Az adott kötvényre benyújtott ajánlatok árának minimuma, maximuma és átlaga a névérték százalékában.
+
+A további oszlopokat nem használom fel
+# számított oszlopok
 
 |Oszlop neve|Tipusa|Jelentése|Értékkészlete|
 | --- | ----------- |-- | 
@@ -67,6 +103,9 @@ A táblázat tartalmaz egy hibát, amit javítottam
 # TODO
 hiba javítása
 csak fix
+https://akk.hu/statisztika/hozamok-indexek-forgalmi-adatok/referenciahozamok
+# konfidencia intervallum: sokaság: jövőbeli aukciók
+# Idő szándékos figyelmen kívül hagyása
 
 hosszabb futamidejű kötvények hozama magasabb
 

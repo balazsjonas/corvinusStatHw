@@ -1,30 +1,43 @@
 # Project:  Többváltozós adatelemzési módszerek
 # Szerző:   Jónás Balázs
 
+
 # Előkészületek ####
+
 ## Szükséges packagek telepítése ====
 install.packages("readxl")
 install.packages("RcmdrMisc")
 install.packages("tidyr") # 
 install.packages("psych") # csúcsosság, ferdeség
+install.packages("rcompanion")
+install.packages("ggplot2")
+
+## szükséges packagek betöltése
 library(readxl)
 library(tidyr)
 library(RcmdrMisc)
-
+library(psych)
+library(rcompanion)
+library(ggplot2)
 ## Adatok betöltése és tisztítása ====
 auctions <- read_excel("AUCTION_220110173944.xlsx")
 auctions <- as.data.frame(auctions)
-
+auctions$year <- as.numeric(format(auctions$Date, format="%Y"))
+auctions$period <- .bincode(auctions$year, seq(1990, 2030, 10), right=F)
+plot(auctions$year, auctions$period)
 
 # 1 éves lejáratra kétféle jelölést használtak
-auctions[auctions$Tenor=="12M"]<-"1Y"
+auctions$Tenor[auctions$Tenor=="12M"]<-"1Y"
 auctions$Tenor<-as.factor(auctions$Tenor)
 
 # Új kibocsátások szűrése
-auctions<-auctions[auctions$Type=="ISSUE",]
+auctions<-auctions[auctions$Type=="ISSUE",]  ## TODO REMOVE
+issues<-auctions[auctions$Type=="ISSUE",]
+
 
 # cserepapírokra nem lesz szükség
 auctions <- auctions[1:21]
+issues <- issues[1:21]
 
 # rendezés hetek szerint
 auctions$yearAndweeks <- strftime(auctions$date, format = "%Y-W%V")
@@ -39,62 +52,101 @@ plot(y$Date, y$`5Y`)
 
 
 # Az 5 éves kötvények átlaghozamának leíró statisztikája ####
-auctions$`Accepted (mln)`
-bond5 <- auctions[auctions$Tenor == "5Y", c("Date", "Avg Yield (%)")]
-bond5 <- auctions[auctions$Tenor == "5Y", c("Date", "Accepted (mln)", "Announced (mln)")]
-yield5 <- bond5$`Accepted (mln)`
+
+bond5 <- issues[issues$Tenor == "5Y", c("Date", "Accepted (mln)", "Avg Yield (%)")]
+# Oszlopok nevét egyszerűsítem
+colnames(bond5) <- c("Date", "AcceptedAmount", "Yield")
+
 
 ## Gyakorisági táblázat ####
 
-binnedCounts(yield5, breaks = 8)
+binnedCounts(bond5$AcceptedAmount, breaks = 8)
 
 
 ## Hisztogram ####
-hist(yield5,
-     xlab="Átlagos hozam",
-     main="Az 5 éves kötvények átlagos hozama kibocsátáskor")
+hist(bond5$AcceptedAmount,
+     xlab="Elfogadott mennyiség",
+     main="Az elfogadott mennyiségek az 5 éves kötvények elsődleges kibocsátásakor")
+ggplot(data=bond5, aes(x=AcceptedAmount/1000)) +
+  geom_histogram(bins=21)+
+  labs(title="Az elfogadott mennyiségek az 5 éves kötvények elsődleges kibocsátásakor",
+       x="Elfogadott mennyiség (milliárd Forint)",
+       y= "Gyakoriság (db)")
 # hist(bond5[bond5$Date>"2010-01-01", "Avg Yield (%)"])
 # hist(bond5[bond5$Date<"2000-01-01", "Avg Yield (%)"])
 
 
 ## Helyzetmutatók ####
 
+acceptedBonds5 <- bond5$AcceptedAmount
 ### Módusz ####
-sprintf("módusz: %s", names(table(yield5)[table(yield5) == max(table(yield5))]))
+mostFrequentValues <- names(table(acceptedBonds5)[table(acceptedBonds5) == max(table(acceptedBonds5))])
+modusz <- mean(as.numeric(mostFrequentValues))
+sprintf("módusz: %s", modusz)
 
 ### Medián ####
-sprintf("medián: %s", median(yield5, na.rm = TRUE))
+sprintf("medián: %s", median(acceptedBonds5, na.rm = TRUE))
 
 ### Átlag ####
-sprintf("átlag: %s", format(mean(yield5, na.rm = TRUE), digits =3))
-
-### Kvantilisek ####                            ))
-summary(yield5)
-
-### Doboz ábra ----
-boxplot(yield5)
-
-### Szóródás ----
-sprintf("szórás: %s", format(sd(yield5, na.rm = T), digits = 3))
-relativ_szoras <- sd(yield5, na.rm = T)/mean(yield5, na.rm = T)
+sprintf("átlag: %s", format(mean(acceptedBonds5, na.rm = TRUE), digits =3))
 
 ### alak mutatók ----
-describe(yield5)
-# positive skew (jobbra )
+describe(acceptedBonds5)
 
-plot(bond5$Date, bond5$`Accepted (mln)`)
-# 2009 körül stratégia váltás
+# A helyzetmutatók között határozott sorrend állapítható meg: módusz < medián < átlag
+# valamint a ferdeség pozitív. Ez alapján az eloszlás jobbra elnyúló.
 
-# TODO ####
-# kiugró értékek
-# átlag medián viszonya + histogram
+### Kvantilisek ####                            ))
+summary(acceptedBonds5)
 
-# nem numerikus változó
+### Doboz ábra ----
+boxplot(acceptedBonds5) # TODO REMOVE
+ggplot(data=bond5, aes(y=AcceptedAmount)) +
+  geom_boxplot()
+
+
+### Szóródás ----
+sprintf("szórás: %s", format(sd(acceptedBonds5, na.rm = T), digits = 3))
+relativ_szoras <- sd(acceptedBonds5, na.rm = T)/mean(acceptedBonds5, na.rm = T)
+
+
+plot(bond5$Date, bond5$AcceptedAmount)
+# 2009 körül stratégia váltás: gyakoribb aukciók során kisebb mennyiségek kibocsátása
+
+### Outlierek
+q<-summary(acceptedBonds5) # named numbers of min, Q1, median, mean, Q3, max
+Q3 <- q[5]
+Q1 <- q[2]
+korlat = Q3 + 1.5 * (Q3 - Q1)
+
+# Eredeti adasorban hol szerepelnek a kiugró értékek:
+(auctions[auctions$Tenor=="5Y" & auctions$`Accepted (mln)`> korlat,"Date"])
+# A dátumokból látszi, hogy a nagyobb kibocsátások 2007-2008-as és 2020-as
+# nehezebb időkben történek 
+
+
+# Nem numerikus változó
 summary(auctions$Tenor)
-# mi értelmezhető
+# mi értelmezhető????
+
+
 
 
 # Intervallumbecslés és egymintás hipotézisvizsgálat ####
+
+x <- issues[,c("Tenor", "Avg Yield (%)")]
+x <- x[x$Tenor=="3M" | x$Tenor == "6M" | x$Tenor=="1Y"|
+         x$Tenor == "3Y" | x$Tenor=="5Y" | x$Tenor == "10Y"|
+         x$Tenor == "15Y" | x$Tenor== "20Y", ]
+colnames(x)<- c("Tenor", "Yield")
+y<-groupwiseMean(Yield ~ Tenor,
+              data = x,
+              conf= 0.95,
+              digits = 3,
+              na.rm = T)
+y$order <- c(6,7,3,8,1,4,5,2)
+y[order(y$order),]
+# TODO order by tenor!!!!!
 
 ###
 ## This Is a Level 2 Header ================================
