@@ -23,8 +23,11 @@ library(ggplot2)
 auctions <- read_excel("AUCTION_220110173944.xlsx")
 auctions <- as.data.frame(auctions)
 auctions$year <- as.numeric(format(auctions$Date, format="%Y"))
-auctions$period <- .bincode(auctions$year, seq(1990, 2030, 10), right=F)
-plot(auctions$year, auctions$period)
+periodLength <- 10
+periodStarts <- seq(1990, 2030, periodLength)
+auctions$period <- .bincode(auctions$year, periodStarts, right=F)
+auctions$PeriodStart  <- as.factor(periodStarts[auctions$period])
+plot(auctions$year, auctions$PeriodStart) # check
 
 # 1 éves lejáratra kétféle jelölést használtak
 auctions$Tenor[auctions$Tenor=="12M"]<-"1Y"
@@ -36,8 +39,8 @@ issues<-auctions[auctions$Type=="ISSUE",]
 
 
 # cserepapírokra nem lesz szükség
-auctions <- auctions[1:21]
-issues <- issues[1:21]
+# auctions <- auctions[1:21]
+# issues <- issues[1:21]
 
 # rendezés hetek szerint
 auctions$yearAndweeks <- strftime(auctions$date, format = "%Y-W%V")
@@ -53,9 +56,9 @@ plot(y$Date, y$`5Y`)
 
 # Az 5 éves kötvények átlaghozamának leíró statisztikája ####
 
-bond5 <- issues[issues$Tenor == "5Y", c("Date", "Accepted (mln)", "Avg Yield (%)")]
+bond5 <- issues[issues$Tenor == "5Y", c("Date", "Accepted (mln)", "Avg Yield (%)", "PeriodStart")]
 # Oszlopok nevét egyszerűsítem
-colnames(bond5) <- c("Date", "AcceptedAmount", "Yield")
+colnames(bond5) <- c("Date", "AcceptedAmount", "Yield", "PeriodStart")
 
 
 ## Gyakorisági táblázat ####
@@ -125,14 +128,26 @@ korlat = Q3 + 1.5 * (Q3 - Q1)
 # nehezebb időkben történek 
 
 
-# Nem numerikus változó
+# Különböző lejáratokra meghírdetett aukciók gyakorisága ####
 summary(auctions$Tenor)
-# mi értelmezhető????
+# értelmezhető: gyakoriság
 
 
 
 
 # Intervallumbecslés és egymintás hipotézisvizsgálat ####
+
+
+ggplot(data=bond5,aes(y=AcceptedAmount, x=PeriodStart)) +
+  geom_boxplot()
+ggplot(data=bond5,aes(y=Yield, x=PeriodStart)) +
+  geom_boxplot()
+
+groupwiseMean(Yield ~ PeriodStart,
+              data=bond5,
+              conf=0.95,
+              digits=3,
+              na.rm=T)
 
 x <- issues[,c("Tenor", "Avg Yield (%)")]
 x <- x[x$Tenor=="3M" | x$Tenor == "6M" | x$Tenor=="1Y"|

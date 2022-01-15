@@ -13,77 +13,71 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Probléma felvetése
-Célom a magyar államkötvények elsődleges kibocsátásának vizsgálata.
+# Probléma felvetése
+
+Célom a magyar államkötvények első forgalomba hozatalának vizsgálata. Az 5 éves lejárat aukcióinak forgalmi és hozam adatait vizsgáltam.
+
+Leíró statisztikához az elfogadott mennyiség
 
 ## Adatok forrása és feldolgozása
-Forrás: https://akk.hu/statistics/government-securities/main-features-government-securities
+Forrás: https://akk.hu/statistics/historical-data
+
 Elérés: 2022. január 10 du. 5:39
-A táblázat a magyar államkötvények aukciók tartalmazza 1987-től. A tábla 21 ismérvet és 3758 megfigyelést tartalmaz.
+
+A táblázat a magyar államkötvények aukciók tartalmazza 1987-től, 21 ismérvet és 3758 megfigyelést tartalmaz.
 
 
 ## Adatok jellemzése
 
-### Type
-Nominális tipus. Lehetséges értékei:
 
-* ISSUE (elsődleges kibocsátás)
-* BUYBACK (visszavásárlási aukció)
-* SUBSCRIPTION (jegyzés)
-* NON_COMPETITIVE (aukciót követően az ott kialakult árfolyamon lejegyzett államkötvények)
-* TAP_ISSUE (rábocsátás)
-* SWITCH (csereaukció)
+|Oszlop neve|Tipusa|Jelentése|
+| :---: | :----: |  :---: |
+|Type|Nominális|Tranzakció típusa: *ISSUE* (elsődleges kibocsátás), *BUYBACK*(visszavásárlási aukció), *SUBSCRIPTION* (jegyzés), *NON_COMPETETITIVE* (aukciót követő jegyzési mód), *TAP_ISSUE* (rábocsátás), *SWITCH* (csereaukció) |
+|Tenor|Ordinális|A kötvény futamidejét jelöli években, hónapokban vagy hetekben. Fontos megjegyezni, hogy ebben az esetben a különbség nem értelmezhető, ezért nem tekinthető intervallum típusnak|
+|Security Type|Nominális|A kötvény típusát jelöli|
+|Alias|Nominális|A kötvény rövid neve.|
+|Date|Intervallum|Az aukció dátuma. A dolgozatban nem vettem figyelembe az ismérvek időbeli alakulását, csak néhány helyen a jelenség megértésénél használtam fel.|
+|Settlement|Intervallum|Az elszámolás napja.|
+|Maturity Date|Intervallum|A kötvény lejáratának napja.|
+|Interest Type|Nominális|Diszkont, fix vagy változó kamatozású kötvény|
+
+### A Kötvények keresletére, hozamára és árára vonatkozó adatok
+
+|Oszlop neve|Tipusa|Jelentése|
+| :---: | :----: |  :---: |
+|Announced (mln)|Arányskála|Meghirdetett mennyiség névértéke millió forintban|
+|Bid Amount (mln)|Arányskála|Benyújtott mennyiség névértéke millió forintban|
+|Accepted (mln)|Arányskála|Elfogadott mennyiség névértéke millió forintban|
+|Min Yield (%)|Arányskála|Az elfogadott ajánlatok közül a legalacsonyabb hozamú ajánlat|
+|Max Yield (%)|Arányskála|Az elfogadott ajánlatok közül a legmagasabb hozamú ajánlat|
+|Avg Yield (%)|Arányskála|Az elfogadott ajánlatok mennyiséggel súlyozott átlaga|
+|Min Price (%)|Arányskála|Az elfogadott ajánlatok közül a legalacsonyabb árfolyamú a névérték százalékában|
+|Max Price (%)|Arányskála|Az elfogadott ajánlatok közül a legmagasabb árfolyamú a névérték százalékában|
+|Avg Price (%)|Arányskála|Az elfogadott ajánlatok közül árfolyamainak mennyiséggel súlyozott átlaga a névérték százalékában|
+
+### számított oszlopok
+Hasznosnak tartottam kiemelni a dátumból az évet. Ezt a dataframeben "Year"-nek neveztem, intervallum típusú ismérv.
+
+
+Az idő helyett 10 éves időszakokat vizsgáltam. Jelenleg diszjunkt időszakok, amelyeken a rendezés értelmezett, ezért tekinthető ordinális típusnak.
+
+
+### Megjegyzések
 
 A dolgozatban csak az elsődleges kibocsátások (ISSUE) ismérveit fogom vizsgálni.
 
-
-### Tenor
-Ordinális tipus, mely a kötvény futamidejét jelöli hónapokban vagy években. A kötvény tipusától függően különböző jelölést használtak az 1 éves referencia papír esetén: diszkont kincstárjegy esetén "12M", államkötvény esetén az "1Y" jelölést használták. Az adattisztítás során egységes "1Y"-ra cseréltem.
-
-Fontos megjegyezni, hogy ebben az esetben a különbség nem értelmezhető, ezért nem tekinthető intervallum típusnak.
-####### TODO: range 3M - 20Y
+A Tenor változóban kötvény tipusától függően különböző jelölést használtak az 1 éves referencia papír esetén: diszkont kincstárjegy esetén "12M", államkötvény esetén az "1Y" jelölést használták. Az adattisztítás során egységes "1Y"-ra cseréltem.
 <!-- #példa: -->
-<!-- # Type	Tenor	Security Type	Alias	Date	Settlement	Interest Type	Announced (mln)	Maturity Date -->
-<!-- # ISSUE	10Y	KTV	2013/D	2003.05.15	2003.05.22	Fix	30,000.00	2013.02.12 -->
-<!-- #ISSUE	3Y	KTV	2013/D	2009.05.07	2009.05.13	Fix	5,000.00	2013.02.12 -->
+<!-- Type	Tenor	Security Type	Alias	Date	Settlement	Interest Type	Announced (mln)	Maturity Date -->
+<!-- ISSUE	10Y	KTV	2013/D	2003.05.15	2003.05.22	Fix	30,000.00	2013.02.12 -->
+<!-- ISSUE	3Y	KTV	2013/D	2009.05.07	2009.05.13	Fix	5,000.00	2013.02.12 -->
 
 
-### Security Type
-Nominális típus, amely a kötvény típusát jelöli.
+Hozamok és árfolyamok csak akkor értelmezhetőek, ha az elfogadott mennyiség pozitív, azaz sikeres volt az aukció. A sikertelen aukciókat a hozamok vizsgálatakor kiszűrtem.
 
+<!-- Fel nem használt ismérvek -->
+A "Pro-rata (%)", "Bid pcs", "Accepted pcs" ismérvek pontos definícióját nem találtam meg. Bár az "ISIN" számít az értékpapír azonosítójának, nem lesz szükség rá. A további oszlopok a csereaukciók során felajánlott értékpapírok.
 
-### Alias
-Nominális típus. A kötvény rövid neve.
-
-### Date
-Intervallum típus. Az aukció dátuma.
-
-### Settlement
-Intervallum típus. Az elszámolás napja.
-
-### Maturity Date
-Intervallum típus. A kötvény lejáratának napja.
-
-### Interest Type
-Nominális típus. Diszkont, fix vagy változó kamatozású kötvény.
-
-### Kötvények keresletére vonatkozó adatok
-Arány típusú ismérvek, melyek meghirdetett, benyújtott és elfogadott mennyiség : Announced (mln), Bid Amount (mln) és Accepted (mln)
-
-### Kötvények hozamára vonatkozó adatok
-Arány típusú ismérvek. Az adott kötvényre benyújtott ajánlatok hozamainak minimuma, maximuma és átlaga százalékban.
-
-### Kötvények árfolyamára vonatkozó adatok
-Arány típusú ismérvek. Az adott kötvényre benyújtott ajánlatok árának minimuma, maximuma és átlaga a névérték százalékában.
-
-A további oszlopokat nem használom fel
-# számított oszlopok
-
-|Oszlop neve|Tipusa|Jelentése|Értékkészlete|
-| --- | ----------- |-- | 
-|Type|Nominális|Tranzakció típusa|pl elsődleges kibocsátás, visszavásárlás
-|Tenor|Ordinális|Referencia lejárat|
-|Security|Nominális|Kötvény típusa|Kötvény, diszkont kincstárjegy vagy lakossági papír
 
 
 # Megszorítások
@@ -97,7 +91,10 @@ visszavásárlások: Ebben az esetben az állam vevő szerepében jelenik meg, g
 
 Abban az esetben, ha egy aukció eredménytelen volt, a hozam értéke nem értelmezhető.
 
-A táblázat tartalmaz egy hibát, amit javítottam
+<!-- A táblázat tartalmaz egy hibát, amit javítottam-->
+
+
+# 2. Elsődleges piacon kibocsátott 5 éves államkötvények leíró statisztika
 
 
 # TODO
