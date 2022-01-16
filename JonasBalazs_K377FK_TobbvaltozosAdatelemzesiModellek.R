@@ -5,9 +5,10 @@
 # Előkészületek ####
 
 ## Szükséges packagek telepítése ====
-install.packages("readxl")
+install.packages("rmarkdown") # dokumentáció
+install.packages("readxl") # Excel
 install.packages("RcmdrMisc")
-install.packages("tidyr") # 
+install.packages("tidyr")
 install.packages("psych") # csúcsosság, ferdeség
 install.packages("rcompanion")
 install.packages("ggplot2")
@@ -22,62 +23,56 @@ library(ggplot2)
 ## Adatok betöltése és tisztítása ====
 auctions <- read_excel("AUCTION_220110173944.xlsx")
 auctions <- as.data.frame(auctions)
-auctions$year <- as.numeric(format(auctions$Date, format="%Y"))
+year <- as.numeric(format(auctions$Date, format="%Y"))
 periodLength <- 10
 periodStarts <- seq(1990, 2030, periodLength)
-auctions$period <- .bincode(auctions$year, periodStarts, right=F)
-auctions$PeriodStart  <- as.factor(periodStarts[auctions$period])
-plot(auctions$year, auctions$PeriodStart) # check
+period <- .bincode(year, periodStarts, right=F)
+auctions$Period  <- as.factor(paste(
+  periodStarts[period],
+  "-", 
+  periodStarts[period]+periodLength-1))
+plot(auctions$Date, auctions$Period) # check
 
 # 1 éves lejáratra kétféle jelölést használtak
 auctions$Tenor[auctions$Tenor=="12M"]<-"1Y"
 auctions$Tenor<-as.factor(auctions$Tenor)
 
 # Új kibocsátások szűrése
-auctions<-auctions[auctions$Type=="ISSUE",]  ## TODO REMOVE
 issues<-auctions[auctions$Type=="ISSUE",]
 
-
-# cserepapírokra nem lesz szükség
-# auctions <- auctions[1:21]
-# issues <- issues[1:21]
-
 # rendezés hetek szerint
-auctions$yearAndweeks <- strftime(auctions$date, format = "%Y-W%V")
-str(auctions)
-
-y <- pivot_wider(auctions, names_from = Tenor, values_from =  `Avg Yield (%)`)
-plot(y$Date, y$`10Y`)
-plot(y$Date, y$`15Y`)
-plot(y$Date, y$`10Y`)
-plot(y$Date, y$`20Y`)
-plot(y$Date, y$`5Y`)
+# auctions$yearAndweeks <- strftime(auctions$date, format = "%Y-W%V")
+# str(auctions)
+# 
+# y <- pivot_wider(auctions, names_from = Tenor, values_from =  `Avg Yield (%)`)
+# plot(y$Date, y$`10Y`)
+# plot(y$Date, y$`15Y`)
+# plot(y$Date, y$`10Y`)
+# plot(y$Date, y$`20Y`)
+# plot(y$Date, y$`5Y`)
 
 
 # Az 5 éves kötvények átlaghozamának leíró statisztikája ####
 
-bond5 <- issues[issues$Tenor == "5Y", c("Date", "Accepted (mln)", "Avg Yield (%)", "PeriodStart")]
+bond5 <- issues[issues$Tenor == "5Y", c("Date", "Accepted (mln)", "Avg Yield (%)", "Period")]
 # Oszlopok nevét egyszerűsítem
-colnames(bond5) <- c("Date", "AcceptedAmount", "Yield", "PeriodStart")
+colnames(bond5) <- c("Date", "AcceptedAmount", "Yield", "Period")
+# Olvashatóság miatt az elfogadott mennyiséget millárd forintban használom
+bond5$AcceptedAmount <- bond5$AcceptedAmount/1000
 
 
 ## Gyakorisági táblázat ####
 
-binnedCounts(bond5$AcceptedAmount, breaks = 8)
+binnedCounts(bond5$AcceptedAmount, breaks = 6)
 
 
 ## Hisztogram ####
-hist(bond5$AcceptedAmount,
-     xlab="Elfogadott mennyiség",
-     main="Az elfogadott mennyiségek az 5 éves kötvények elsődleges kibocsátásakor")
-ggplot(data=bond5, aes(x=AcceptedAmount/1000)) +
-  geom_histogram(bins=21)+
+
+ggplot(data=bond5, aes(x=AcceptedAmount)) +
+  geom_histogram(bins=16)+
   labs(title="Az elfogadott mennyiségek az 5 éves kötvények elsődleges kibocsátásakor",
        x="Elfogadott mennyiség (milliárd Forint)",
        y= "Gyakoriság (db)")
-# hist(bond5[bond5$Date>"2010-01-01", "Avg Yield (%)"])
-# hist(bond5[bond5$Date<"2000-01-01", "Avg Yield (%)"])
-
 
 ## Helyzetmutatók ####
 
@@ -103,7 +98,6 @@ describe(acceptedBonds5)
 summary(acceptedBonds5)
 
 ### Doboz ábra ----
-boxplot(acceptedBonds5) # TODO REMOVE
 ggplot(data=bond5, aes(y=AcceptedAmount)) +
   geom_boxplot()
 
@@ -113,8 +107,8 @@ sprintf("szórás: %s", format(sd(acceptedBonds5, na.rm = T), digits = 3))
 relativ_szoras <- sd(acceptedBonds5, na.rm = T)/mean(acceptedBonds5, na.rm = T)
 
 
-plot(bond5$Date, bond5$AcceptedAmount)
 # 2009 körül stratégia váltás: gyakoribb aukciók során kisebb mennyiségek kibocsátása
+#plot(bond5$Date, bond5$AcceptedAmount)
 
 ### Outlierek
 q<-summary(acceptedBonds5) # named numbers of min, Q1, median, mean, Q3, max
@@ -122,13 +116,13 @@ Q3 <- q[5]
 Q1 <- q[2]
 korlat = Q3 + 1.5 * (Q3 - Q1)
 
-# Eredeti adasorban hol szerepelnek a kiugró értékek:
-(auctions[auctions$Tenor=="5Y" & auctions$`Accepted (mln)`> korlat,"Date"])
-# A dátumokból látszi, hogy a nagyobb kibocsátások 2007-2008-as és 2020-as
+# Eredeti adatsorban hol szerepelnek a kiugró értékek:
+(bond5[bond5$AcceptedAmount>korlat, "Date"])
+# A dátumokból látszik, hogy a nagyobb kibocsátások 2007-2008-as és 2020-as
 # nehezebb időkben történek 
 
 
-# Különböző lejáratokra meghírdetett aukciók gyakorisága ####
+# Különböző lejáratokra meghirdetett aukciók gyakorisága ####
 summary(auctions$Tenor)
 # értelmezhető: gyakoriság
 
@@ -169,3 +163,7 @@ y[order(y$order),]
 ### This is a level 3 header. ------------------------------
 
 # TODO 12M vs 1Y ####
+# CLEAN UP ####
+
+# Clear environment
+rm(list = ls()) 
