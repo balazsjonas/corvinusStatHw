@@ -10,7 +10,7 @@ install.packages("readxl") # Excel
 install.packages("RcmdrMisc")
 install.packages("tidyr")
 install.packages("psych") # csúcsosság, ferdeség
-install.packages("rcompanion")
+install.packages("rcompanion") # groupwise statistics
 install.packages("ggplot2")
 
 ## szükséges packagek betöltése
@@ -35,10 +35,24 @@ plot(auctions$Date, auctions$Period) # check
 
 # 1 éves lejáratra kétféle jelölést használtak
 auctions$Tenor[auctions$Tenor=="12M"]<-"1Y"
-auctions$Tenor<-as.factor(auctions$Tenor)
+# auctions$Tenor<-as.factor(auctions$Tenor) # alfabetikus rendezést használ
 
-# Új kibocsátások szűrése
-issues<-auctions[auctions$Type=="ISSUE",]
+referenceBonds <- c("3M", "6M",
+                    "1Y", "3Y","5Y",
+                    "10Y", "15Y", "20Y",
+                    "other")
+# manuális rendezés:
+auctions$Tenor<- factor(auctions$Tenor,
+                        levels=referenceBonds)
+auctions$Tenor <- auctions$Tenor %>% replace_na(replace = "other")
+
+
+# Szűrés új kibocsátásokra és fix kamatozási kötvényekre
+issues<-auctions[auctions$Type=="ISSUE"
+                 & auctions$`Interest Type`!="Float",]
+
+
+
 
 # rendezés hetek szerint
 # auctions$yearAndweeks <- strftime(auctions$date, format = "%Y-W%V")
@@ -108,7 +122,12 @@ relativ_szoras <- sd(acceptedBonds5, na.rm = T)/mean(acceptedBonds5, na.rm = T)
 
 
 # 2009 körül stratégia váltás: gyakoribb aukciók során kisebb mennyiségek kibocsátása
-#plot(bond5$Date, bond5$AcceptedAmount)
+plot(bond5$Date, bond5$AcceptedAmount)
+ggplot(data=bond5, aes(x=Date, y=AcceptedAmount)) +
+  geom_point()+
+  labs(title = "Kibocsátott 5 éves kötvények az idő függvényében",
+      x="Dátum",
+      y="Elfogadott mennyiség (Md forint)")
 
 ### Outlierek
 q<-summary(acceptedBonds5) # named numbers of min, Q1, median, mean, Q3, max
@@ -128,42 +147,87 @@ summary(auctions$Tenor)
 
 
 
-
 # Intervallumbecslés és egymintás hipotézisvizsgálat ####
 
+# Kevés esik azonos napra, ezért inkább az időszakot használom minőségi változónak.
+# y2 <- pivot_wider(
+#   issues[issues$Tenor=="3Y"|issues$Tenor=="5Y",
+#            c("Date", "Tenor", "Avg Yield (%)", "Accepted (mln)")],
+#   names_from = Tenor, 
+#   values_from =  `Avg Yield (%)`)
 
-ggplot(data=bond5,aes(y=AcceptedAmount, x=PeriodStart)) +
-  geom_boxplot()
-ggplot(data=bond5,aes(y=Yield, x=PeriodStart)) +
+# A hozamok vizsgálatánál csak a sikeres aukciókat veszem figyelembe.
+bond5successful <- bond5[bond5$AcceptedAmount>0, ]
+ggplot(data=remove_missing(bond5successful, na.rm=TRUE, vars="Yield"),
+  aes(y=Yield, x=Period)) +
   geom_boxplot()
 
-groupwiseMean(Yield ~ PeriodStart,
-              data=bond5,
+
+## Átlag becslése időszakok szerint bontva ====
+groupwiseMean(Yield ~ Period,
+              data=bond5successful,
               conf=0.95,
               digits=3,
               na.rm=T)
 
-x <- issues[,c("Tenor", "Avg Yield (%)")]
-x <- x[x$Tenor=="3M" | x$Tenor == "6M" | x$Tenor=="1Y"|
-         x$Tenor == "3Y" | x$Tenor=="5Y" | x$Tenor == "10Y"|
-         x$Tenor == "15Y" | x$Tenor== "20Y", ]
-colnames(x)<- c("Tenor", "Yield")
-y<-groupwiseMean(Yield ~ Tenor,
-              data = x,
-              conf= 0.95,
+## Medián becslése időszakok szerint bontva ####
+groupwiseMedian(Yield ~ Period,
+              data=bond5successful,
+              conf=0.95,
+              digits=3,
+              R = 1000,
+              percentile = TRUE,
+              bca = FALSE
+              )
+# Aukciók darabszámának eloszlása időszakonként ####
+# A legutolsó időszakból még csak két év telt el, de az aukciók aránya már értelmezhető.
+
+ggplot(data=subset(issues, Tenor %in% referenceBonds ), 
+       aes(x=Period, fill =Tenor)) +
+  geom_bar(position="fill") +
+  scale_fill_brewer(palette="Dark2")
+
+# Az előző időszak arányai
+round(prop.table(table(issues[issues$Period=="2010 - 2019", "Tenor"]))*100, 1)
+
+auctionTypes <- issues[, c("Period", "Tenor") ]
+auctionTypes$fiveYear <- 0
+auctionTypes$fiveYear[auctionTypes$Tenor == "5Y"] <- 1
+groupwiseMean(fiveYear ~ 1,
+              data=auctionTypes,
+              conf=0.95,
+              digits=3
+              )
+groupwiseMean(fiveYear ~ Period,
+              data=auctionTypes, 
+              conf = 0.95,
               digits = 3,
-              na.rm = T)
-y$order <- c(6,7,3,8,1,4,5,2)
-y[order(y$order),]
-# TODO order by tenor!!!!!
+              na.rm = TRUE
+              )
+
+# Egymintás hipotézisvizsgálat ####
+# Igaz-e, hogy az Államadósság Kezelő a három hónapos aukciókon a meghirdetettnél több ajánlatot fogad el.
+bond3 <- issues[issues$Tenor=="3M",]
+bond3$Rate <- bond3$`Accepted (mln)`/bond3$`Announced (mln)`
+# Állítás: bond3$rate > 1
+# H0: mu = 1
+# H1: mu < 1
+
+# p-érték: 
+t.test(bond3$Rate, mu = 1, alternative = "less")
 
 ###
 ## This Is a Level 2 Header ================================
 
 ### This is a level 3 header. ------------------------------
 
-# TODO 12M vs 1Y ####
+
 # CLEAN UP ####
 
 # Clear environment
 rm(list = ls()) 
+
+# TODO ####
+## egységes formázás ----
+## kisbetű nagybetű ----
+

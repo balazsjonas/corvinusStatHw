@@ -6,7 +6,6 @@ author: |-
 date: "1/11/2022"
 output:
   word_document: default
-  html_document: default
 ---
 
 ```{r warning=FALSE, include=FALSE}
@@ -27,9 +26,15 @@ library(ggplot2, warn.conflicts = FALSE)
 
 # Probléma felvetése
 
-Célom a magyar államkötvények első forgalomba hozatalának vizsgálata. Az 5 éves lejárat aukcióinak forgalmi és hozam adatait vizsgáltam.
+Célom a magyar államkötvények első forgalomba hozatalának vizsgálata. 
 
-Leíró statisztikához az elfogadott mennyiség
+Az első részben bemutatom az adat forrását és ismérveit. A második részben az 5 éves lejárat aukcióinak forgalmi adatait és az különböző lejáratok gyakoriságát vizsgáltam. A harmadik részben másik változót, a kötvény kibocsátáskori hozamát vizsgáltam, valamint ennek változását az elmúlt évtizedekben.
+Az 5 éves lejárat aukcióinak forgalmi és hozam adatait vizsgáltam. 
+
+Meg kell jegyezni, hogy az ismérvek időfüggését figyelmen kívül hagytam és idő helyett nagyobb időszakokat, mint kategóriákat használtam. Mivel a táblázat az összes aukció adatát tartalmazza, ezért az intervallumbecslések feltételei automatikusan teljesülnek.
+
+
+# TODO Leíró statisztikához az elfogadott mennyiség
 
 ## Adatok forrása és feldolgozása
 Forrás: https://akk.hu/statistics/historical-data
@@ -51,9 +56,18 @@ auctions$Period  <- as.factor(paste(
   periodStarts[period]+periodLength-1))
 # 1 éves lejáratra kétféle jelölést használtak
 auctions$Tenor[auctions$Tenor=="12M"]<-"1Y"
-auctions$Tenor<-as.factor(auctions$Tenor)
-# Új kibocsátások szűrése
-issues<-auctions[auctions$Type=="ISSUE",]
+
+referenceBonds <- c("3M", "6M",
+                    "1Y", "3Y","5Y",
+                    "10Y", "15Y", "20Y",
+                    "other")
+auctions$Tenor<- factor(auctions$Tenor,
+                        levels=referenceBonds)
+auctions$Tenor <- auctions$Tenor %>% replace_na(replace = "other")
+
+# Szűrés új kibocsátásokra és fix kamatozási kötvényekre
+issues<-auctions[auctions$Type=="ISSUE"
+                 & auctions$`Interest Type`!="Float",]
 ```
 
 
@@ -98,7 +112,7 @@ Az idő helyett 10 éves időszakokat vizsgáltam. Jelenleg diszjunkt időszakok
 A dolgozatban csak az elsődleges kibocsátások (ISSUE) ismérveit fogom vizsgálni.
 
 A Tenor változóban kötvény tipusától függően különböző jelölést használtak az 1 éves referencia papír esetén: diszkont kincstárjegy esetén "12M", államkötvény esetén az "1Y" jelölést használták. Az adattisztítás során egységes "1Y"-ra cseréltem.
-<!-- #példa: -->
+<!-- Példa: -->
 <!-- Type	Tenor	Security Type	Alias	Date	Settlement	Interest Type	Announced (mln)	Maturity Date -->
 <!-- ISSUE	10Y	KTV	2013/D	2003.05.15	2003.05.22	Fix	30,000.00	2013.02.12 -->
 <!-- ISSUE	3Y	KTV	2013/D	2009.05.07	2009.05.13	Fix	5,000.00	2013.02.12 -->
@@ -125,7 +139,7 @@ Abban az esetben, ha egy aukció eredménytelen volt, a hozam értéke nem érte
 <!-- A táblázat tartalmaz egy hibát, amit javítottam-->
 
 
-# 2. Elsődleges piacon kibocsátott 5 éves államkötvények leíró statisztika
+# 2. Elsődleges piacon kibocsátott 5 éves államkötvények leíró statisztikája
 
 Az olvashatóság javítása érdekében az elfogadott mennyiségeket a táblázathoz képest milliárd forintban jelenítem meg.
 
@@ -160,7 +174,7 @@ sprintf("módusz: %s", modusz)
 sprintf("medián: %s", median(acceptedBonds5, na.rm = TRUE))
 sprintf("átlag: %s", format(mean(acceptedBonds5, na.rm = TRUE), digits =3))
 sprintf("szórás: %s", format(sd(acceptedBonds5, na.rm = T), digits = 3))
-sprintf("relatív szórás: %s") sd(acceptedBonds5, na.rm = T)/mean(acceptedBonds5, na.rm = T)
+sprintf("relatív szórás: %s", sd(acceptedBonds5, na.rm = T)/mean(acceptedBonds5, na.rm = T))
 describe(acceptedBonds5)
 summary(acceptedBonds5)
 ```
@@ -195,12 +209,119 @@ summary(auctions$Tenor)
 ```
 
 
+# 3. Az 5 éves államkötvények hozamának vizsgálata az időszak függvényében
+
+A hozamok vizsgálatakor csak a sikeres aukciókat érdemes figyelembe venni, amit az elfogadott mennyiség alapján lehet kiszűrni. Az 5 éves kötvény esetén ez megegyezik azzal a feltétellel, hogy az átlaghozam pozitív, de bízzunk benne, hogy egyszer nekünk is sikerül 0%-os hozammal forrást bevonni az 5 éves lejáraton. 
+<!-- Jelenleg a német 5 éves hozam -0.4%  -->
+```{r message=FALSE, include=FALSE}
+bond5successful <- bond5[bond5$AcceptedAmount>0, ]
+```
+```{r echo=FALSE, message=TRUE}
+ggplot(data=remove_missing(bond5successful, na.rm=TRUE, vars="Yield"),
+  aes(y=Yield, x=Period)) +
+  geom_boxplot()
+```
+
+## Az átlag hozam becslése időszakok szerint bontva
+
+```{r echo=TRUE, message=TRUE}
+groupwiseMean(Yield ~ Period,
+              data=bond5successful,
+              conf=0.95,
+              digits=3,
+              na.rm=T)
+
+groupwiseMedian(Yield ~ Period,
+              data=bond5successful,
+              conf=0.95,
+              digits=3,
+              R = 1000,
+              percentile = TRUE,
+              bca = FALSE
+              )
+```
+
+A három periódusban rendre csökkent a hozam átlaga és mediánja is, a konfidencia-intervallumok között nincs átfedés. Érdekes, hogy mindhárom időszakban a medián kisebb, mint az átlag, a 90-es éveknél a doboz ábrán nem látszik feltűnő ferdeség.
+
+## Lejáratok aránya különböző időszakokban
+
+A kibocsátó érdekelt az átlagos hátralévő futamidő növelésében, mivel ez csökkenti a finanszírozás kockázatait (pl megújítási kockázat, kamatkiadások kockázata). Ez a cél támogatható rövid hátralévő lejáratú kötvények visszavásárlásával vagy cseréjével, vagy éppen a hosszabb lejáratok előnyben részesítése.
+
+Az alábbi ábrán a kibocsátott kötvények mennyisége látható az idő függvényében. 2009 körül startégiaváltás vehető észre: gyakoribb aukciók során kisebb mennyiségek kibocsátása. Ezzel valószínűleg jobban kontrollálható a kockázat és költség.
+```{r echo=FALSE}
+ggplot(data=bond5, aes(x=Date, y=AcceptedAmount)) +
+  geom_point()+
+  labs(title = "Kibocsátott 5 éves kötvények az idő függvényében",
+      x="Dátum",
+      y="Elfogadott mennyiség (Md forint)")
+```
+
+```{r echo=TRUE}
+ggplot(data=subset(issues, Tenor %in% referenceBonds ), 
+       aes(x=Period, fill =Tenor)) +
+  geom_bar(position="fill") +
+  scale_fill_brewer(palette="Dark2")
+```
+
+Az 5 és 10 éves lejáratok aránya emelkedett a három időszak folyamán.
+Az elmúlt időszak arányai:
+```{r echo=FALSE}
+round(prop.table(table(issues[issues$Period=="2010 - 2019", "Tenor"]))*100, 1)
+```
+
+```{r include=FALSE}
+auctionTypes <- issues[, c("Period", "Tenor") ]
+auctionTypes$fiveYear <- 0
+auctionTypes$fiveYear[auctionTypes$Tenor == "5Y"] <- 1
+```
+
+Az ötéves aukciók aránya az egész mintában és időszakok szerint bontva:
+```{r echo=FALSE}
+groupwiseMean(fiveYear ~ 1,
+              data=auctionTypes,
+              conf=0.95,
+              digits=3)
+groupwiseMean(fiveYear ~ Period,
+              data=auctionTypes, 
+              conf = 0.95,
+              digits = 3,
+              na.rm = TRUE
+              )
+```
+A 2000-es és 2010-es évek között egyértelmű a különbség, a konfidencia-intervallumok távol vannak egymástól. A 2020-szal kezdődő időszakra nem egyértelmű az arány növekedése.
+
+## Egymintás hipotézisvizsgálat
+Igaz-e, hogy az Államadósság Kezelő több ajánlatot fogad el, mint amennyit meghirdet. Ez átfogalmazva azt jelenti, hogy az elfogadott és meghirdetett mennyiség hányadosa nagyobb mint 1.
+
+```{r include=FALSE}
+bond3 <- issues[issues$Tenor=="3M",]
+bond3$Rate <- bond3$`Accepted (mln)`/bond3$`Announced (mln)`
+```
+Állítás: elfogadott / meghirdetett > 1
+
+H0: mu = 1
+
+H1: mu <1
+
+```{r echo=TRUE}
+t.test(bond3$Rate, mu = 1, alternative = "less")
+```
+
+A p-érték 1, vagyis bármely szignifikancia szint mellett elfogadjuk H0-t, az állítás stabil.
+
+A legfrissebb aukció eredménye itt érhető el:
+
+https://akk.hu/statistics/auction-results/discount-treasury-bill-auctions
+
+
+
+
 # TODO
 hiba javítása
 csak fix
 https://akk.hu/statisztika/hozamok-indexek-forgalmi-adatok/referenciahozamok
 # konfidencia intervallum: sokaság: jövőbeli aukciók
 # Idő szándékos figyelmen kívül hagyása
+# feliratok, x, y tengelyek
 
-hosszabb futamidejű kötvények hozama magasabb
 
