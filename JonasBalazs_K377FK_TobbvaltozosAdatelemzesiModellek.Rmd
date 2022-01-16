@@ -16,12 +16,14 @@ output:
 # install.packages("psych") # csúcsosság, ferdeség
 # install.packages("rcompanion")
 # install.packages("ggplot2")
+# install.packages("questionr") # Cramer
 library(readxl, warn.conflicts = FALSE)
 library(tidyr, warn.conflicts = FALSE)
 library(RcmdrMisc, warn.conflicts = FALSE)
 library(psych, warn.conflicts = FALSE)
 library(rcompanion, warn.conflicts = FALSE)
 library(ggplot2, warn.conflicts = FALSE)
+library(rcompanion, warn.conflicts = FALSE)
 ```
 
 # Probléma felvetése
@@ -256,14 +258,7 @@ ggplot(data=bond5, aes(x=Date, y=AcceptedAmount)) +
       y="Elfogadott mennyiség (Md forint)")
 ```
 
-```{r echo=TRUE}
-ggplot(data=subset(issues, Tenor %in% referenceBonds ), 
-       aes(x=Period, fill =Tenor)) +
-  geom_bar(position="fill") +
-  scale_fill_brewer(palette="Dark2")
-```
 
-Az 5 és 10 éves lejáratok aránya emelkedett a három időszak folyamán.
 Az elmúlt időszak arányai:
 ```{r echo=FALSE}
 round(prop.table(table(issues[issues$Period=="2010 - 2019", "Tenor"]))*100, 1)
@@ -291,6 +286,7 @@ groupwiseMean(fiveYear ~ Period,
 A 2000-es és 2010-es évek között egyértelmű a különbség, a konfidencia-intervallumok távol vannak egymástól. A 2020-szal kezdődő időszakra nem egyértelmű az arány növekedése.
 
 ## Egymintás hipotézisvizsgálat
+### 1. hipotézis vizsgálat
 Igaz-e, hogy az Államadósság Kezelő több ajánlatot fogad el, mint amennyit meghirdet. Ez átfogalmazva azt jelenti, hogy az elfogadott és meghirdetett mennyiség hányadosa nagyobb mint 1.
 
 ```{r include=FALSE}
@@ -313,6 +309,45 @@ A legfrissebb aukció eredménye itt érhető el:
 
 https://akk.hu/statistics/auction-results/discount-treasury-bill-auctions
 
+
+### 2. hipotiézis vizsgálat
+
+Igaz-e, hogy az 5 éves hozamok mediánja 4.9%? Ahogy korábban láttuk a 2000-es évek és 2010-es évek átlaghozama jelentősen eltér. Az egész időszakra nézve az eloszlás bimodális.
+
+H0: median == 4.9
+
+H1: median != 4.9
+
+```{r echo=TRUE}
+wilcox.test(bond5$Yield, mu=4.9, exact=FALSE)
+```
+
+A p-érték 0.54, elfogadjuk H0-t.
+
+# Kétváltozós kapcsoslatvizsgálat
+## Időszak és lejárat kapcsolata
+
+```{r echo=TRUE}
+ggplot(data=subset(issues,issues$`Accepted (mln)`> 0 ), 
+       aes(x=Period, fill =Tenor)) +
+  geom_bar(position="fill") +
+  scale_fill_brewer(palette="Dark2")
+```
+
+Az 5 és 10 éves lejáratok aránya emelkedett a három időszak folyamán.
+
+``` {r echo=TRUE}
+cramer.v(table(issues[issues$`Accepted (mln)`>0,c("Period", "Tenor")]))
+```
+
+A Cramer-együttható értéke 0.2882, a kapcsolat gyenge.
+
+További kérdés, hogy a "sokaságban", vagyis a későbbi aukciók során is megmarad ez a gyenge kapcsolat, 
+
+``` {r echo=TRUE}
+chisq.test(table(issues[issues$`Accepted (mln)`>0,c("Period", "Tenor")]))
+```
+A p-érték lényegében 0-nak tekinthető, ezért semmilyen alfa érték mellett nem tudjuk elvetni H1-et, vagyis a kapcsolat gyenge, de szignifikáns.
 
 
 

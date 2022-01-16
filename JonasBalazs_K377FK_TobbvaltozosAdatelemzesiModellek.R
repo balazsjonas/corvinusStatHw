@@ -12,6 +12,7 @@ install.packages("tidyr")
 install.packages("psych") # csúcsosság, ferdeség
 install.packages("rcompanion") # groupwise statistics
 install.packages("ggplot2")
+install.packages("questionr") # Cramer
 
 ## szükséges packagek betöltése
 library(readxl)
@@ -20,6 +21,7 @@ library(RcmdrMisc)
 library(psych)
 library(rcompanion)
 library(ggplot2)
+library(rcompanion)
 ## Adatok betöltése és tisztítása ====
 auctions <- read_excel("AUCTION_220110173944.xlsx")
 auctions <- as.data.frame(auctions)
@@ -179,13 +181,6 @@ groupwiseMedian(Yield ~ Period,
               percentile = TRUE,
               bca = FALSE
               )
-# Aukciók darabszámának eloszlása időszakonként ####
-# A legutolsó időszakból még csak két év telt el, de az aukciók aránya már értelmezhető.
-
-ggplot(data=subset(issues, Tenor %in% referenceBonds ), 
-       aes(x=Period, fill =Tenor)) +
-  geom_bar(position="fill") +
-  scale_fill_brewer(palette="Dark2")
 
 # Az előző időszak arányai
 round(prop.table(table(issues[issues$Period=="2010 - 2019", "Tenor"]))*100, 1)
@@ -216,7 +211,24 @@ bond3$Rate <- bond3$`Accepted (mln)`/bond3$`Announced (mln)`
 # p-érték: 
 t.test(bond3$Rate, mu = 1, alternative = "less")
 
-###
+# Igaz-e, hogy az 5 éves hozamok mediánja 4.9%
+# H0: median = 4.9
+# H1: median != 4.9
+# hist(bond5$Yield) # TODO ggplot
+wilcox.test(bond5$Yield, mu=4.9, exact=FALSE)
+
+
+## Időszak és lejárat kapcsolata ====
+# A legutolsó időszakból még csak két év telt el, de az aukciók aránya már értelmezhető.
+
+ggplot(data=subset(issues,issues$`Accepted (mln)`> 0 ), 
+       aes(x=Period, fill =Tenor)) +
+  geom_bar(position="fill") +
+  scale_fill_brewer(palette="Dark2")
+
+cramer.v(table(issues[issues$`Accepted (mln)`>0,c("Period", "Tenor")]))
+
+chisq.test(table(issues[issues$`Accepted (mln)`>0,c("Period", "Tenor")]))
 ## This Is a Level 2 Header ================================
 
 ### This is a level 3 header. ------------------------------
