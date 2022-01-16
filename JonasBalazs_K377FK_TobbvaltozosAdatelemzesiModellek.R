@@ -229,6 +229,17 @@ ggplot(data=subset(issues,issues$`Accepted (mln)`> 0 ),
 cramer.v(table(issues[issues$`Accepted (mln)`>0,c("Period", "Tenor")]))
 
 chisq.test(table(issues[issues$`Accepted (mln)`>0,c("Period", "Tenor")]))
+
+## Időszak és hozam kapcsolata
+aov(Yield ~ Period, data=bond5[bond5$AcceptedAmount>0,])
+
+sprintf("Between: %s", 2143.8)
+sprintf("Residuals: %s", 1672.6)
+sprintf("H2: %s", 2143.8/ (2143.8 + 1672.6))
+summary(aov(Yield ~ Period, data=bond5[bond5$AcceptedAmount>0,]))
+sd(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2000 - 2009",]$Yield)
+sd(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2010 - 2019",]$Yield)
+
 ## This Is a Level 2 Header ================================
 
 ### This is a level 3 header. ------------------------------

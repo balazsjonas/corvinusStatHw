@@ -23,7 +23,7 @@ library(RcmdrMisc, warn.conflicts = FALSE)
 library(psych, warn.conflicts = FALSE)
 library(rcompanion, warn.conflicts = FALSE)
 library(ggplot2, warn.conflicts = FALSE)
-library(rcompanion, warn.conflicts = FALSE)
+library(questionr, warn.conflicts = FALSE)
 ```
 
 # Probléma felvetése
@@ -348,6 +348,30 @@ További kérdés, hogy a "sokaságban", vagyis a későbbi aukciók során is m
 chisq.test(table(issues[issues$`Accepted (mln)`>0,c("Period", "Tenor")]))
 ```
 A p-érték lényegében 0-nak tekinthető, ezért semmilyen alfa érték mellett nem tudjuk elvetni H1-et, vagyis a kapcsolat gyenge, de szignifikáns.
+
+## Időszak és hozam kapcsolata
+
+```{r echo=TRUE}
+aov(Yield ~ Period, data=bond5[bond5$AcceptedAmount>0,])
+sprintf("Between: %s", 2143.8)
+sprintf("Residuals: %s", 1672.6)
+sprintf("H2: %s", 2143.8/ (2143.8 + 1672.6))
+```
+
+A variancia-hányados 56.2%, a p-érték lényegében 0, kisebb 1% alfánál is, így H0 elutasítható, így a időszak és hozam kapcsolata erős és szignifikáns.
+
+Feltételek ellenőrzése:
+```{r echo=TRUE}
+ks.test(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2000 - 2009",]$Yield, "pnorm")
+```
+```{r echo=FALSE}
+sprintf("2000-2009-es időszak hozamainak szórása: %s",
+        sd(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2000 - 2009",]$Yield))
+sprintf("2010-2019-es időszak hozamainak szórása: %s",
+        sd(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2010 - 2019",]$Yield))
+
+```
+A Kolmogorov-Smirnov test szerint a p-érték lényegében 0, ezért a null-hipotézist el kell vetnünk, vagyis az első időszakban a hozamok nem normális eloszlásúak. Az azonos szórás feltétele is sérül. Ezek miatt a korábban számított p-érték nem megbízható.
 
 
 
