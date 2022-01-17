@@ -240,10 +240,16 @@ summary(aov(Yield ~ Period, data=bond5[bond5$AcceptedAmount>0,]))
 sd(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2000 - 2009",]$Yield)
 sd(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2010 - 2019",]$Yield)
 
-## This Is a Level 2 Header ================================
 
-### This is a level 3 header. ------------------------------
+## Két mennyiségi változó
 
+ggplot(data=bond5, aes(x=AcceptedAmount, y=Yield)) +
+  geom_point()
+
+sprintf("A két változó közötti korreláció: %s",
+        cor(bond5$AcceptedAmount, bond5$Yield))
+(reg <- lm(Yield ~ AcceptedAmount, bond5))
+summary(reg)
 
 # CLEAN UP ####
 

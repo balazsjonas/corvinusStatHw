@@ -374,6 +374,22 @@ sprintf("2010-2019-es időszak hozamainak szórása: %s",
 A Kolmogorov-Smirnov test szerint a p-érték lényegében 0, ezért a null-hipotézist el kell vetnünk, vagyis az első időszakban a hozamok nem normális eloszlásúak. Az azonos szórás feltétele is sérül. Ezek miatt a korábban számított p-érték nem megbízható.
 
 
+## Két mennyiségi változó kapcsolata
+
+Utolsó vizsgálat tárgya a kötvények mennyiségének és hozamának kapcsolata
+```{r echo=FALSE}
+ggplot(data=bond5, aes(x=AcceptedAmount, y=Yield)) +
+  geom_point() +
+  geom_smooth(method=lm)
+```
+```{r echo=TRUE}
+sprintf("A két változó közötti korreláció: %s",
+        cor(bond5$AcceptedAmount, bond5$Yield))
+(reg <- lm(Yield ~ AcceptedAmount, bond5))
+summary(reg)
+```
+A korreláció negatív és abszolút értéke kisebb 0.3-nál. A kapcsolat ellentétes, de gyenge. Nagyobb kereslethez magasabb ár tartozik, a kötvény ára és hozama között monoton csökkenő kapcsolat van. A p-érték 0.0004 1%-nál is kisebb, ezért elvetjük, hogy az egyenes meredeksége 0, így a kapcsolat szignifikáns.
+
 
 # TODO
 hiba javítása
