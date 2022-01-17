@@ -26,6 +26,8 @@ library(rcompanion)
 auctions <- read_excel("AUCTION_220110173944.xlsx")
 auctions <- as.data.frame(auctions)
 year <- as.numeric(format(auctions$Date, format="%Y"))
+
+# 10 éves időszakok generálása
 periodLength <- 10
 periodStarts <- seq(1990, 2030, periodLength)
 period <- .bincode(year, periodStarts, right=F)
@@ -33,11 +35,10 @@ auctions$Period  <- as.factor(paste(
   periodStarts[period],
   "-", 
   periodStarts[period]+periodLength-1))
-plot(auctions$Date, auctions$Period) # check
+# plot(auctions$Date, auctions$Period) # check
 
 # 1 éves lejáratra kétféle jelölést használtak
 auctions$Tenor[auctions$Tenor=="12M"]<-"1Y"
-# auctions$Tenor<-as.factor(auctions$Tenor) # alfabetikus rendezést használ
 
 referenceBonds <- c("3M", "6M",
                     "1Y", "3Y","5Y",
@@ -54,26 +55,14 @@ issues<-auctions[auctions$Type=="ISSUE"
                  & auctions$`Interest Type`!="Float",]
 
 
-
-
-# rendezés hetek szerint
-# auctions$yearAndweeks <- strftime(auctions$date, format = "%Y-W%V")
-# str(auctions)
-# 
-# y <- pivot_wider(auctions, names_from = Tenor, values_from =  `Avg Yield (%)`)
-# plot(y$Date, y$`10Y`)
-# plot(y$Date, y$`15Y`)
-# plot(y$Date, y$`10Y`)
-# plot(y$Date, y$`20Y`)
-# plot(y$Date, y$`5Y`)
-
-
 # Az 5 éves kötvények átlaghozamának leíró statisztikája ####
 
 bond5 <- issues[issues$Tenor == "5Y", c("Date", "Accepted (mln)", "Avg Yield (%)", "Period")]
+
 # Oszlopok nevét egyszerűsítem
 colnames(bond5) <- c("Date", "AcceptedAmount", "Yield", "Period")
-# Olvashatóság miatt az elfogadott mennyiséget millárd forintban használom
+
+# Olvashatóság miatt az elfogadott mennyiséget milliárd forintban használom
 bond5$AcceptedAmount <- bond5$AcceptedAmount/1000
 
 
@@ -93,24 +82,27 @@ ggplot(data=bond5, aes(x=AcceptedAmount)) +
 ## Helyzetmutatók ####
 
 acceptedBonds5 <- bond5$AcceptedAmount
-### Módusz ####
+
+
+### Módusz ----
 mostFrequentValues <- names(table(acceptedBonds5)[table(acceptedBonds5) == max(table(acceptedBonds5))])
 modusz <- mean(as.numeric(mostFrequentValues))
-sprintf("módusz: %s", modusz)
+sprintf("Módusz: %s", modusz)
 
-### Medián ####
-sprintf("medián: %s", median(acceptedBonds5, na.rm = TRUE))
 
-### Átlag ####
-sprintf("átlag: %s", format(mean(acceptedBonds5, na.rm = TRUE), digits =3))
+### Medián ----
+sprintf("Medián: %s", median(acceptedBonds5, na.rm = TRUE))
 
-### alak mutatók ----
+### Átlag ----
+sprintf("Átlag: %s", format(mean(acceptedBonds5, na.rm = TRUE), digits =3))
+
+## Alak mutatók ====
 describe(acceptedBonds5)
 
 # A helyzetmutatók között határozott sorrend állapítható meg: módusz < medián < átlag
 # valamint a ferdeség pozitív. Ez alapján az eloszlás jobbra elnyúló.
 
-### Kvantilisek ####                            ))
+## Kvantilisek ====
 summary(acceptedBonds5)
 
 ### Doboz ábra ----
@@ -119,19 +111,18 @@ ggplot(data=bond5, aes(y=AcceptedAmount)) +
 
 
 ### Szóródás ----
-sprintf("szórás: %s", format(sd(acceptedBonds5, na.rm = T), digits = 3))
+sprintf("Szórás: %s", format(sd(acceptedBonds5, na.rm = T), digits = 3))
 relativ_szoras <- sd(acceptedBonds5, na.rm = T)/mean(acceptedBonds5, na.rm = T)
 
 
 # 2009 körül stratégia váltás: gyakoribb aukciók során kisebb mennyiségek kibocsátása
-plot(bond5$Date, bond5$AcceptedAmount)
 ggplot(data=bond5, aes(x=Date, y=AcceptedAmount)) +
   geom_point()+
   labs(title = "Kibocsátott 5 éves kötvények az idő függvényében",
       x="Dátum",
       y="Elfogadott mennyiség (Md forint)")
 
-### Outlierek
+### Outlierek ----
 q<-summary(acceptedBonds5) # named numbers of min, Q1, median, mean, Q3, max
 Q3 <- q[5]
 Q1 <- q[2]
@@ -151,18 +142,15 @@ summary(auctions$Tenor)
 
 # Intervallumbecslés és egymintás hipotézisvizsgálat ####
 
-# Kevés esik azonos napra, ezért inkább az időszakot használom minőségi változónak.
-# y2 <- pivot_wider(
-#   issues[issues$Tenor=="3Y"|issues$Tenor=="5Y",
-#            c("Date", "Tenor", "Avg Yield (%)", "Accepted (mln)")],
-#   names_from = Tenor, 
-#   values_from =  `Avg Yield (%)`)
-
 # A hozamok vizsgálatánál csak a sikeres aukciókat veszem figyelembe.
 bond5successful <- bond5[bond5$AcceptedAmount>0, ]
+
 ggplot(data=remove_missing(bond5successful, na.rm=TRUE, vars="Yield"),
   aes(y=Yield, x=Period)) +
-  geom_boxplot()
+  geom_boxplot() +
+  labs(title="5 éves kötvények hozama",
+       x="Időszak",
+       y="Hozam (%)")
 
 
 ## Átlag becslése időszakok szerint bontva ====
@@ -172,7 +160,7 @@ groupwiseMean(Yield ~ Period,
               digits=3,
               na.rm=T)
 
-## Medián becslése időszakok szerint bontva ####
+## Medián becslése időszakok szerint bontva ====
 groupwiseMedian(Yield ~ Period,
               data=bond5successful,
               conf=0.95,
@@ -182,7 +170,7 @@ groupwiseMedian(Yield ~ Period,
               bca = FALSE
               )
 
-# Az előző időszak arányai
+## Az előző időszak arányai ====
 round(prop.table(table(issues[issues$Period=="2010 - 2019", "Tenor"]))*100, 1)
 
 auctionTypes <- issues[, c("Period", "Tenor") ]
@@ -200,10 +188,14 @@ groupwiseMean(fiveYear ~ Period,
               na.rm = TRUE
               )
 
-# Egymintás hipotézisvizsgálat ####
-# Igaz-e, hogy az Államadósság Kezelő a három hónapos aukciókon a meghirdetettnél több ajánlatot fogad el.
+
+## Egymintás hipotézisvizsgálat ====
+
+### Igaz-e, hogy az Államadósság Kezelő a három hónapos aukciókon a meghirdetettnél több ajánlatot fogad el. ----
+
 bond3 <- issues[issues$Tenor=="3M",]
 bond3$Rate <- bond3$`Accepted (mln)`/bond3$`Announced (mln)`
+
 # Állítás: bond3$rate > 1
 # H0: mu = 1
 # H1: mu < 1
@@ -211,7 +203,7 @@ bond3$Rate <- bond3$`Accepted (mln)`/bond3$`Announced (mln)`
 # p-érték: 
 t.test(bond3$Rate, mu = 1, alternative = "less")
 
-# Igaz-e, hogy az 5 éves hozamok mediánja 4.9%
+### Igaz-e, hogy az 5 éves hozamok mediánja 4.9% ----
 # H0: median = 4.9
 # H1: median != 4.9
 # hist(bond5$Yield) # TODO ggplot
@@ -219,18 +211,24 @@ wilcox.test(bond5$Yield, mu=4.9, exact=FALSE)
 
 
 ## Időszak és lejárat kapcsolata ====
+
 # A legutolsó időszakból még csak két év telt el, de az aukciók aránya már értelmezhető.
 
 ggplot(data=subset(issues,issues$`Accepted (mln)`> 0 ), 
        aes(x=Period, fill =Tenor)) +
   geom_bar(position="fill") +
-  scale_fill_brewer(palette="Dark2")
+  scale_fill_brewer(palette="Dark2") +
+  labs(title="Lejáratok aránya",
+       x="Arány (%)",
+       y="Időszak")
 
 cramer.v(table(issues[issues$`Accepted (mln)`>0,c("Period", "Tenor")]))
 
 chisq.test(table(issues[issues$`Accepted (mln)`>0,c("Period", "Tenor")]))
 
-## Időszak és hozam kapcsolata
+
+## Időszak és hozam kapcsolata ====
+
 aov(Yield ~ Period, data=bond5[bond5$AcceptedAmount>0,])
 
 sprintf("Between: %s", 2143.8)
@@ -241,10 +239,13 @@ sd(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2000 - 2009",]$Yield)
 sd(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2010 - 2019",]$Yield)
 
 
-## Két mennyiségi változó
+## Két mennyiségi változó ====
 
 ggplot(data=bond5, aes(x=AcceptedAmount, y=Yield)) +
-  geom_point()
+  geom_point() +
+  labs("Hozam és elfogadott mennyiség kapcsolata\n5 éves kötvények aukcióján",
+       x="Elfogadott mennyiség",
+       y="Hozam")
 
 sprintf("A két változó közötti korreláció: %s",
         cor(bond5$AcceptedAmount, bond5$Yield))
@@ -253,10 +254,4 @@ summary(reg)
 
 # CLEAN UP ####
 
-# Clear environment
 rm(list = ls()) 
-
-# TODO ####
-## egységes formázás ----
-## kisbetű nagybetű ----
-
