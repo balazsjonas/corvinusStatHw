@@ -1,0 +1,183 @@
+---
+title: "Államkötvények leíró statisztikája"
+author: "Jónás Balázs"
+date: "1/19/2022"
+output: ioslides_presentation
+---
+
+```{r warning=FALSE, include=FALSE}
+# install.packages("rmarkdown") # dokumentáció
+# install.packages("readxl") # Excel
+# install.packages("RcmdrMisc")
+# install.packages("tidyr")
+# install.packages("psych") # csúcsosság, ferdeség
+# install.packages("rcompanion")
+# install.packages("ggplot2")
+# install.packages("questionr") # Cramer
+library(readxl, warn.conflicts = FALSE)
+library(tidyr, warn.conflicts = FALSE)
+library(RcmdrMisc, warn.conflicts = FALSE)
+library(psych, warn.conflicts = FALSE)
+library(rcompanion, warn.conflicts = FALSE)
+library(ggplot2, warn.conflicts = FALSE)
+library(questionr, warn.conflicts = FALSE)
+```
+
+## Tartalom
+
+<!-- motiváció -->
+1. Adatok bemutatása
+2. Leíró statisztika: 5 éves kötvény aukciók
+3. Intervallumbecslés, egymintás hipotézisvizsgálat
+4.
+
+## Adatok bemutatása
+
+|Oszlop neve|Tipusa|
+| :----: | :----: |
+|Type|Nominális|
+|Tenor|Ordinális|
+|Date|Intervallum|
+|...|...|...|
+|Announced (mln)|Arányskála|
+|...|...|...|
+|Avg Yield (%)|Arányskála|
+
+
+```{r include=FALSE}
+## Adatok betöltése és tisztítása ====
+auctions <- read_excel("AUCTION_220110173944.xlsx")
+auctions <- as.data.frame(auctions)
+year <- as.numeric(format(auctions$Date, format="%Y"))
+
+# 10 éves időszakok generálása
+periodLength <- 10
+periodStarts <- seq(1990, 2030, periodLength)
+period <- .bincode(year, periodStarts, right=F)
+auctions$Period  <- as.factor(paste(
+  periodStarts[period],
+  "-", 
+  periodStarts[period]+periodLength-1))
+
+# 1 éves lejáratra kétféle jelölést használtak
+auctions$Tenor[auctions$Tenor=="12M"]<-"1Y"
+
+# https://akk.hu/statisztika/hozamok-indexek-forgalmi-adatok/referenciahozamok
+referenceBonds <- c("3M", "6M",
+                    "1Y", "3Y","5Y",
+                    "10Y", "15Y", "20Y",
+                    "other")
+# manuális rendezés:
+auctions$Tenor<- factor(auctions$Tenor,
+                        levels=referenceBonds)
+auctions$Tenor <- auctions$Tenor %>% replace_na(replace = "other")
+
+# Szűrés új kibocsátásokra és fix kamatozási kötvényekre
+issues<-auctions[auctions$Type=="ISSUE"
+                 & auctions$`Interest Type`!="Float",]
+```
+
+
+## Adatok bemutatása: Tenor {data-background=#bbffbb}
+
+Benjamin Button és a kötvény életciklusa.
+
+| Tenor | Alias | Date | Maturity Date | Hátralévő futamidő |
+| :---: | :---: | :---: | :---: | :---: |
+| 10Y | 2013/D | 2002.01.10 | 2013.02.12 | 11 év 1 hónap | 
+| 3Y | 2013/D | 2009.05.07 | 2013.02.12| 3 év 9 hónap |
+| 1Y | 2013/D | 2012.04.18 | 2013.02.12 | 10 hónap |
+| 6M | 2013/D | 2012.05.16 | 2013.02.12 | 9 hónap |
+| 6M | 2013/D | 2012.09.05 | 2013.02.12 | 5 hónap |
+| 3M | 2013/D | 2012.09.19 | 2013.02.12 | 5 hónap |
+| 3M | 2013/D | 2012.10.31 | 2013.02.12 | 3 hónap |
+
+
+## Adatok bemutatása: Szűrések
+
+- Lakossági állampapírok
+- Devizakötvények
+- Csereaukciók
+- Visszavásárlások
+- Változó kamatozású kötvények
+
+
+## 5 éves kötvényaukciók
+
+```{r include=FALSE}
+bond5 <- issues[issues$Tenor == "5Y", c("Date", "Accepted (mln)", "Avg Yield (%)", "Period")]
+
+# Oszlopok nevét egyszerűsítem
+colnames(bond5) <- c("Date", "AcceptedAmount", "Yield", "Period")
+
+# Olvashatóság miatt az elfogadott mennyiséget millárd forintban használom
+bond5$AcceptedAmount <- bond5$AcceptedAmount/1000
+```
+```{r echo=FALSE, message=TRUE}
+ggplot(data=bond5, aes(x=AcceptedAmount)) +
+  geom_histogram(bins=16)+
+  labs(title="Az elfogadott mennyiségek az 5 éves kötvények elsődleges kibocsátásakor",
+       x="Elfogadott mennyiség (milliárd Forint)",
+       y= "Gyakoriság (db)")
+```
+
+## 5 éves kötvényaukciók: Helyzetmutatók {data-background=#bbffbb}
+
+```{r message=FALSE, include=FALSE}
+acceptedBonds5 <- bond5$AcceptedAmount
+mostFrequentValues <- names(table(acceptedBonds5)[table(acceptedBonds5) == max(table(acceptedBonds5))])
+modusz <- mean(as.numeric(mostFrequentValues))
+```
+```{r echo=FALSE, message=FALSE}
+sprintf("Módusz, a leggyakrabban elfogadott mennyiség: %s", modusz)
+sprintf("Medián, az aukciók felében\naz elfogadott menyiség legalább %s", median(acceptedBonds5, na.rm = TRUE))
+sprintf("Átlag: %s", format(mean(acceptedBonds5, na.rm = TRUE), digits =3))
+sprintf("Szórás: %s", format(sd(acceptedBonds5, na.rm = T), digits = 3))
+sprintf("Relatív szórás: %s", sd(acceptedBonds5, na.rm = T)/mean(acceptedBonds5, na.rm = T))
+```
+
+
+## 5 éves kötvényaukciók: Dobozábra {data-background=#bbffbb}
+
+```{r echo=FALSE, include=TRUE}
+summary(acceptedBonds5)
+```
+
+```{r echo=FALSE, include=TRUE,  fig.height=2}
+ggplot(data=bond5, aes(y=AcceptedAmount)) +
+  geom_boxplot() +
+  coord_flip()
+
+```
+Az interkvartilis: 18 - 33.5
+
+Jobbra elnyúló esetben az adatok középső 50%-a a minimumhoz van közelebb
+<!-- határok??? -->
+
+
+## R Markdown
+
+This is an R Markdown presentation. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.
+
+
+## TODO HIÁNYZÓ RÉSZEK HÁTTERE {data-background=#bbffbb}
+## Slide with Bullets
+
+- Bullet 1
+- Bullet 2
+- Bullet 3
+
+## Slide with R Output
+
+```{r cars, echo = TRUE}
+summary(cars)
+```
+
+## Slide with Plot
+
+```{r pressure}
+plot(pressure)
+```
+
