@@ -18,6 +18,7 @@ output:
 # install.packages("rcompanion")
 # install.packages("ggplot2")
 # install.packages("questionr") # Cramer
+# install.packages("lawstat") # levene.test
 library(readxl, warn.conflicts = FALSE)
 library(tidyr, warn.conflicts = FALSE)
 library(RcmdrMisc, warn.conflicts = FALSE)
@@ -25,6 +26,7 @@ library(psych, warn.conflicts = FALSE)
 library(rcompanion, warn.conflicts = FALSE)
 library(ggplot2, warn.conflicts = FALSE)
 library(questionr, warn.conflicts = FALSE)
+library(lawstat, warn.conflicts = FALSE)
 ```
 
 # Probléma felvetése

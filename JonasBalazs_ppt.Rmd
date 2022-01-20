@@ -14,6 +14,7 @@ output: ioslides_presentation
 # install.packages("rcompanion")
 # install.packages("ggplot2")
 # install.packages("questionr") # Cramer
+# install.packages("lawstat") # levene.test
 library(readxl, warn.conflicts = FALSE)
 library(tidyr, warn.conflicts = FALSE)
 library(RcmdrMisc, warn.conflicts = FALSE)
@@ -21,6 +22,7 @@ library(psych, warn.conflicts = FALSE)
 library(rcompanion, warn.conflicts = FALSE)
 library(ggplot2, warn.conflicts = FALSE)
 library(questionr, warn.conflicts = FALSE)
+library(lawstat, warn.conflicts = FALSE)
 ```
 
 ## Tartalom
@@ -128,20 +130,16 @@ acceptedBonds5 <- bond5$AcceptedAmount
 mostFrequentValues <- names(table(acceptedBonds5)[table(acceptedBonds5) == max(table(acceptedBonds5))])
 modusz <- mean(as.numeric(mostFrequentValues))
 ```
-```{r echo=FALSE, message=FALSE}
-sprintf("Módusz, a leggyakrabban elfogadott mennyiség: %s", modusz)
-sprintf("Medián, az aukciók felében\naz elfogadott menyiség legalább %s", median(acceptedBonds5, na.rm = TRUE))
-sprintf("Átlag: %s", format(mean(acceptedBonds5, na.rm = TRUE), digits =3))
-sprintf("Szórás: %s", format(sd(acceptedBonds5, na.rm = T), digits = 3))
-sprintf("Relatív szórás: %s", sd(acceptedBonds5, na.rm = T)/mean(acceptedBonds5, na.rm = T))
-```
-
-
-## 5 éves kötvényaukciók: Dobozábra {data-background=#bbffbb}
 
 ```{r echo=FALSE, include=TRUE}
 summary(acceptedBonds5)
 ```
+
+
+
+
+## 5 éves kötvényaukciók: Dobozábra {data-background=#bbffbb}
+
 
 ```{r echo=FALSE, include=TRUE,  fig.height=2}
 ggplot(data=bond5, aes(y=AcceptedAmount)) +
@@ -149,10 +147,88 @@ ggplot(data=bond5, aes(y=AcceptedAmount)) +
   coord_flip()
 
 ```
+
 Az interkvartilis: 18 - 33.5
 
 Jobbra elnyúló esetben az adatok középső 50%-a a minimumhoz van közelebb
-<!-- határok??? -->
+
+
+## 5 éves aukciók: Korszakonként I.
+
+
+```{r echo=FALSE, include=TRUE}
+ggplot(data=bond5, aes(y=AcceptedAmount, x=Period)) +
+  geom_boxplot() +
+  labs("Elfogadott ajánlatok az 5 éves aukciókon")
+```
+
+
+## 5 éves aukciók: Korszakonként II.{data-background=#bbffbb}
+
+```{r message=FALSE, include=FALSE}
+bond5successful <- bond5[bond5$AcceptedAmount>0, ]
+```
+```{r echo=FALSE, include=TRUE}
+ggplot(data=bond5successful, aes(y=Yield, x=Period)) +
+  geom_boxplot() +
+  labs("Hozamok az 5 éves aukciókon")
+```
+
+
+## 5 éves aukciók: Korszakonként III.{data-background=#bbffbb}
+
+
+```{r echo=FALSE, message=TRUE}
+groupwiseMean(Yield ~ Period,
+              data=bond5successful,
+              conf=0.95,
+              digits=3,
+              na.rm=T)
+
+groupwiseMedian(Yield ~ Period,
+              data=bond5successful,
+              conf=0.95,
+              digits=3,
+              R = 1000,
+              percentile = TRUE,
+              bca = FALSE
+              )
+```
+
+
+## 5 éves aukciók: Korszakonként IV.{data-background=#bbffbb}
+
+
+Hozam időszak függése (ANOVA)
+
+H0: variancia hányados == 0
+
+```{r echo=FALSE, message=TRUE}
+
+summary(aov(Yield ~ Period, data = bond5successful ))
+```
+
+
+SSB = 2144
+
+SSR = 1673
+
+H2 = 0.56 > 50%
+
+
+## 5 éves aukciók: Korszakonként V.{data-background=#bbffbb}
+
+Feltételezések ellenőrzése.
+
+H0: szórások azonosak a csoportokban
+
+H1: legalább az egyik csoport szórása eltér
+
+
+```{r echo=TRUE, message=TRUE,  warning=FALSE}
+levene.test(bond5successful$Yield, bond5successful$Period)
+```
+
 
 
 ## R Markdown

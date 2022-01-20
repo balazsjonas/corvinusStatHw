@@ -13,7 +13,7 @@ install.packages("psych") # csúcsosság, ferdeség
 install.packages("rcompanion") # groupwise statistics
 install.packages("ggplot2")
 install.packages("questionr") # Cramer
-
+install.packages("lawstat") # levene.test
 ## szükséges packagek betöltése
 library(readxl)
 library(tidyr)
@@ -22,6 +22,8 @@ library(psych)
 library(rcompanion)
 library(ggplot2)
 library(rcompanion)
+library(lawstat)
+
 ## Adatok betöltése és tisztítása ====
 auctions <- read_excel("AUCTION_220110173944.xlsx")
 auctions <- as.data.frame(auctions)
@@ -254,4 +256,5 @@ summary(reg)
 
 # CLEAN UP ####
 
-rm(list = ls()) 
+# rm(list = ls()) 
+
