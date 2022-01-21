@@ -107,10 +107,10 @@ Benjamin Button és a kötvény életciklusa.
 ## 5 éves kötvényaukciók
 
 ```{r include=FALSE}
-bond5 <- issues[issues$Tenor == "5Y", c("Date", "Accepted (mln)", "Avg Yield (%)", "Period")]
+bond5 <- issues[issues$Tenor == "5Y", c("Date", "Accepted (mln)", "Avg Yield (%)", "Period", "Avg Price (%)")]
 
 # Oszlopok nevét egyszerűsítem
-colnames(bond5) <- c("Date", "AcceptedAmount", "Yield", "Period")
+colnames(bond5) <- c("Date", "AcceptedAmount", "Yield", "Period", "Price")
 
 # Olvashatóság miatt az elfogadott mennyiséget millárd forintban használom
 bond5$AcceptedAmount <- bond5$AcceptedAmount/1000
@@ -229,31 +229,170 @@ H1: legalább az egyik csoport szórása eltér
 levene.test(bond5successful$Yield, bond5successful$Period)
 ```
 
+## 5 éves aukciók: Hozamok
 
 
-## R Markdown
-
-This is an R Markdown presentation. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.
-
-
-## TODO HIÁNYZÓ RÉSZEK HÁTTERE {data-background=#bbffbb}
-## Slide with Bullets
-
-- Bullet 1
-- Bullet 2
-- Bullet 3
-
-## Slide with R Output
-
-```{r cars, echo = TRUE}
-summary(cars)
+```{r echo=FALSE, message=TRUE}
+ggplot(data=bond5, aes(x=Yield)) +
+  geom_histogram(bins=16)+
+  labs(title="Az 5 éves kötvények hozama elsődleges kibocsátásakor",
+       x="Hozamok (%)",
+       y= "Gyakoriság (db)")
 ```
 
-## Slide with Plot
 
-```{r pressure}
-plot(pressure)
+## Egymintás hipotézisvizsgálat I.
+
+```{r include=FALSE}
+bond3 <- issues[issues$Tenor=="3M",]
+bond3$Rate <- bond3$`Accepted (mln)`/bond3$`Announced (mln)`
 ```
+
+Állítás: elfogadott / meghirdetett >= 1
+
+H0: mu = 1 || H1: mu <1
+
+```{r echo=TRUE}
+t1 <- t.test(bond3$Rate, mu = 1, alternative = "less")
+sprintf("p-érték: %s", t1$p.value)
+```
+
+A p-érték 1, vagyis bármely szignifikancia szint mellett elfogadjuk H0-t, az állítás stabil.
+
+Hamisnak venni H0-t 100%-os hibavalószínűséggel jár
+
+## Egymintás hipotézisvizsgálat II.
+
+Igaz-e, hogy az 5 éves hozamok mediánja 4.9%?
+
+H0: median == 4.9
+
+H1: median != 4.9
+
+
+```{r echo=TRUE}
+wilcox.test(bond5$Yield, mu=4.9, exact=FALSE)
+```
+
+A p-érték 0.54, elfogadjuk H0-t. H0 elutatásítása 54% hibával jár.
+
+
+## Kétváltozós kapcsoslatvizsgálat I.
+### Időszak és lejárat kapcsolata
+
+
+```{r echo=FALSE, warning=FALSE}
+ggplot(data=subset(issues,issues$`Accepted (mln)`> 0 ), 
+       aes(x=Period, fill =Tenor)) +
+  geom_bar(position="fill") +
+  scale_fill_brewer(palette="Dark2") +
+  labs(title="Lejáratok aránya",
+       x="Arány (%)",
+       y="Időszak")
+```
+
+## Kétváltozós kapcsoslatvizsgálat II.
+### Időszak és lejárt kapcsolata
+
+```{r warning=FALSE}
+cramer.v(table(issues[issues$`Accepted (mln)`>0,c("Period", "Tenor")]))
+```
+
+A Cramer-együttható értéke 0.2882, a kapcsolat gyenge.
+
+## Kétváltozós kapcsoslatvizsgálat II.
+### Általánosítás a sokaságra
+
+További kérdés, hogy a "sokaságban", vagyis a későbbi aukciók során is megmarad ez a gyenge kapcsolat, 
+
+H0: C = 0 || H1: C > 0
+
+``` {r warning=FALSE, echo=FALSE}
+chisq.test(table(issues[issues$`Accepted (mln)`>0,
+                        c("Period", "Tenor")]))
+```
+A p-érték lényegében 0-nak tekinthető, ezért semmilyen alfa érték mellett nem tudjuk elvetni H1-et, vagyis a kapcsolat gyenge, de szignifikáns.
+
+
+## Kétváltozós kapcsoslatvizsgálat II.
+### Feltételek
+
+``` {r warning=FALSE, echo=TRUE}
+table(issues[issues$`Accepted (mln)`>0,c("Period", "Tenor")])
+```
+
+A 6 hónapos referencia lejárat kivezetésre került, a 20 éves pedig bevezetésre.
+
+
+## Két mennyiségi változó kapcsolata I.
+### Mennyiség vs hozam
+
+```{r echo=FALSE}
+ggplot(data=bond5, aes(x=AcceptedAmount, y=Yield)) +
+  geom_point() +
+  labs("Hozam és elfogadott mennyiség kapcsolata\n5 éves kötvények aukcióján",
+       x="Elfogadott mennyiség",
+       y="Hozam")
+```
+
+## Két mennyiségi változó kapcsolata II.
+
+Mennyiség vs hozam
+
+```{r echo=FALSE}
+sprintf("A két változó közötti korreláció: %s",
+        cor(bond5successful$AcceptedAmount, bond5successful$Yield))
+# (reg <- lm(Yield ~ AcceptedAmount, bond5successful))
+```
+
+A korreláció (-0.18) negatív és abszolút értéke kisebb 0.3-nál. A kapcsolat ellentétes, de gyenge.
+
+A p-érték 0.0001 1%-nál is kisebb, ezért elvetjük, hogy az egyenes meredeksége 0, így a kapcsolat szignifikáns.
+
+
+## Két mennyiségi változó kapcsolata III.{data-background=#bbffbb}
+
+Mennyiség és árfolyam
+
+```{r echo=FALSE}
+ggplot(data=bond5successful, aes(x=AcceptedAmount, y=Price)) +
+  geom_point() +
+  labs("Hozam és elfogadott mennyiség kapcsolata\n5 éves kötvények aukcióján",
+       x="Elfogadott mennyiség",
+       y="Árfolyam") +
+  geom_smooth(method=lm)
+```
+
+## Két mennyiségi változó kapcsolata IV.{data-background=#bbffbb}
+```{r echo=FALSE}
+sprintf("Mennyiség és árfolyam közötti korreláció: %s",
+        cor(bond5successful$AcceptedAmount, bond5successful$Price))
+(reg <- lm(Price ~ AcceptedAmount, bond5successful))
+```
+
+<!-- ## R Markdown -->
+
+<!-- This is an R Markdown presentation. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>. -->
+
+<!-- When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. -->
+
+
+<!-- ## TODO HIÁNYZÓ RÉSZEK HÁTTERE {data-background=#bbffbb} -->
+<!-- ## Slide with Bullets -->
+
+<!-- - Bullet 1 -->
+<!-- - Bullet 2 -->
+<!-- - Bullet 3 -->
+
+<!-- ## Slide with R Output -->
+
+<!-- ```{r cars, echo = TRUE} -->
+<!-- summary(cars) -->
+<!-- ``` -->
+
+<!-- ## Slide with Plot -->
+
+<!-- ```{r pressure} -->
+<!-- plot(pressure) -->
+<!-- ``` -->
 
