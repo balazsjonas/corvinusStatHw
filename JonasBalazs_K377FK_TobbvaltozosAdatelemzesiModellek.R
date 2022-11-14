@@ -7,7 +7,7 @@
 ## Szükséges packagek telepítése ====
 install.packages("rmarkdown") # dokumentáció
 install.packages("readxl") # Excel
-install.packages("RcmdrMisc")
+#install.packages("RcmdrMisc")
 install.packages("tidyr")
 install.packages("psych") # csúcsosság, ferdeség
 install.packages("rcompanion") # groupwise statistics

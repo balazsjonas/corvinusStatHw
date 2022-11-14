@@ -17,7 +17,7 @@ output: ioslides_presentation
 # install.packages("lawstat") # levene.test
 library(readxl, warn.conflicts = FALSE)
 library(tidyr, warn.conflicts = FALSE)
-library(RcmdrMisc, warn.conflicts = FALSE)
+# library(RcmdrMisc, warn.conflicts = FALSE)
 library(psych, warn.conflicts = FALSE)
 library(rcompanion, warn.conflicts = FALSE)
 library(ggplot2, warn.conflicts = FALSE)

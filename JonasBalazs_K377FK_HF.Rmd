@@ -1,43 +1,45 @@
 ---
-title: "Többváltozós adatelemzési modellek"
-author: |-
-  Jónás Balázs
-  K377FK
-date: '2022-01-17'
+title: |-
+  Többváltozós statisztikai modellek
+  házi feladat
+author: "Balázs Jónás"
+date: "`r Sys.Date()`"
 output:
-  html_document:
-    df_print: paged
   pdf_document: default
-  word_document: default
+  html_document: default
 ---
 
-```{r warning=FALSE, include=FALSE}
-# install.packages("rmarkdown") # dokumentáció
-# install.packages("readxl") # Excel
-# install.packages("RcmdrMisc")
-# install.packages("tidyr")
-# install.packages("psych") # csúcsosság, ferdeség
-# install.packages("rcompanion")
-# install.packages("ggplot2")
-# install.packages("questionr") # Cramer
-# install.packages("lawstat") # levene.test
-library(readxl, warn.conflicts = FALSE)
-library(tidyr, warn.conflicts = FALSE)
-# library(RcmdrMisc, warn.conflicts = FALSE)
-library(psych, warn.conflicts = FALSE)
-library(rcompanion, warn.conflicts = FALSE)
-library(ggplot2, warn.conflicts = FALSE)
-library(questionr, warn.conflicts = FALSE)
-library(lawstat, warn.conflicts = FALSE)
+  
+```{r dependencies, message=TRUE, warning=FALSE, include=FALSE}
+install.packages('pacman')
+library(pacman)
+pacman::p_load(ggplot2,
+               magrittr, # pipe
+               tidyr, # replace_na
+               readxl # read_excel
+               )
 ```
+
+# TODO
+
+## Leíró statisztika
+
+## bimodális és 5y ammount vs yield
+
+## 1 mintás t test, korreláció
+
+## outlier, winsorized mean
+
+## bimodális kernel estimator
+
+## 5y amoutn vs yield --> knn?
 
 # Probléma felvetése
 
-Célom a magyar államkötvények első forgalomba hozatalának vizsgálata. 
 
-Az első részben bemutatom az adat forrását és ismérveit. A második részben az 5 éves lejárat aukcióinak forgalmi adatait és az különböző lejáratok gyakoriságát vizsgáltam. A harmadik részben másik változót, a kötvény kibocsátáskori hozamát vizsgáltam, valamint ennek változását az elmúlt évtizedekben. Az 5 éves lejárat aukcióinak forgalmi és hozam adatait vizsgáltam. A negyedik részben két egymintás hipotézis vizsgálatot mutatok be. Az ötödik részben több változó kapcsolatát vizsgáltam. Az első példa két mennyiségi változó (lejárat és időszak). A második az időszak és hozam kapcsolatáról szól, a harmadik pedig a már külön vizsgált hozam és kibocsátott mennyiség viszonyát mutatja be.
+Célom a magyar államkötvények első forgalomba hozatalának vizsgálata.
 
-Meg kell jegyezni, hogy az ismérvek időfüggését figyelmen kívül hagytam és idő helyett nagyobb időszakokat, mint kategóriákat használtam. Mivel a táblázat az összes aukció adatát tartalmazza, ezért az intervallumbecslések feltételei automatikusan teljesülnek.
+Az első részben bemutatom az adat forrását és ismérveit.
 
 
 # 1. Adatok forrása és feldolgozása
@@ -47,39 +49,6 @@ Forrás: https://akk.hu/statistics/historical-data
 Elérés: 2022. január 10 du. 5:39
 
 A táblázat a magyar államkötvények aukciók tartalmazza 1987-től, 21 ismérvet és 3758 megfigyelést tartalmaz.
-
-```{r warning=FALSE, include=FALSE}
-## Adatok betöltése és tisztítása ====
-auctions <- read_excel("AUCTION_220110173944.xlsx")
-auctions <- as.data.frame(auctions)
-year <- as.numeric(format(auctions$Date, format="%Y"))
-
-# 10 éves időszakok generálása
-periodLength <- 10
-periodStarts <- seq(1990, 2030, periodLength)
-period <- .bincode(year, periodStarts, right=F)
-auctions$Period  <- as.factor(paste(
-  periodStarts[period],
-  "-", 
-  periodStarts[period]+periodLength-1))
-
-# 1 éves lejáratra kétféle jelölést használtak
-auctions$Tenor[auctions$Tenor=="12M"]<-"1Y"
-
-# https://akk.hu/statisztika/hozamok-indexek-forgalmi-adatok/referenciahozamok
-referenceBonds <- c("3M", "6M",
-                    "1Y", "3Y","5Y",
-                    "10Y", "15Y", "20Y",
-                    "other")
-# manuális rendezés:
-auctions$Tenor<- factor(auctions$Tenor,
-                        levels=referenceBonds)
-auctions$Tenor <- auctions$Tenor %>% replace_na(replace = "other")
-
-# Szűrés új kibocsátásokra és fix kamatozási kötvényekre
-issues<-auctions[auctions$Type=="ISSUE"
-                 & auctions$`Interest Type`!="Float",]
-```
 
 
 
@@ -113,6 +82,7 @@ issues<-auctions[auctions$Type=="ISSUE"
 |Avg Price (%)|Arányskála|Az elfogadott ajánlatok közül árfolyamainak mennyiséggel súlyozott átlaga a névérték százalékában|
 
 ### Számított oszlopok
+
 Hasznosnak tartottam kiemelni a dátumból az évet. Ezt a dataframeben "Year"-nek neveztem, intervallum típusú ismérv.
 
 
@@ -128,6 +98,18 @@ A Tenor változóban kötvény tipusától függően különböző jelölést ha
 <!-- Type	Tenor	Security Type	Alias	Date	Settlement	Interest Type	Announced (mln)	Maturity Date -->
 <!-- ISSUE	10Y	KTV	2013/D	2003.05.15	2003.05.22	Fix	30,000.00	2013.02.12 -->
 <!-- ISSUE	3Y	KTV	2013/D	2009.05.07	2009.05.13	Fix	5,000.00	2013.02.12 -->
+
+### Egy kötvény életciklusa
+
+| Tenor | Alias | Date | Maturity Date | Hátralévő futamidő |
+| :---: | :---: | :---: | :---: | :---: |
+| 10Y | 2013/D | 2002.01.10 | 2013.02.12 | 11 év 1 hónap | 
+| 3Y | 2013/D | 2009.05.07 | 2013.02.12| 3 év 9 hónap |
+| 1Y | 2013/D | 2012.04.18 | 2013.02.12 | 10 hónap |
+| 6M | 2013/D | 2012.05.16 | 2013.02.12 | 9 hónap |
+| 6M | 2013/D | 2012.09.05 | 2013.02.12 | 5 hónap |
+| 3M | 2013/D | 2012.09.19 | 2013.02.12 | 5 hónap |
+| 3M | 2013/D | 2012.10.31 | 2013.02.12 | 3 hónap |
 
 
 Hozamok és árfolyamok csak akkor értelmezhetőek, ha az elfogadott mennyiség pozitív, azaz sikeres volt az aukció. A sikertelen aukciókat a hozamok vizsgálatakor kiszűrtem.
@@ -146,15 +128,42 @@ A devizakötvényeket nem érdemes összevetni a forint kötvényekkel a deviza�
 
 Csereaukciók: nem jut új forráshoz az állam, mind a vevő, mind az eladó részéről elsősorban kockázatkezelési célokat szolgál.
 
-visszavásárlások: Ebben az esetben az állam vevő szerepében jelenik meg, gyakran a lejáratok előtt több részletben vásárolnak vissza kötvényeket
+Visszavásárlások: Ebben az esetben az állam vevő szerepében jelenik meg, gyakran a lejáratok előtt több részletben vásárolnak vissza kötvényeket
 
+```{r loading.excel, warning=FALSE, include=FALSE}
+## Adatok betöltése és tisztítása ====
+auctions <- read_excel("AUCTION_220110173944.xlsx")
+auctions <- as.data.frame(auctions)
+year <- as.numeric(format(auctions$Date, format="%Y"))
 
-# 2. Elsődleges piacon kibocsátott 5 éves államkötvények leíró statisztikája
+# 10 éves időszakok generálása
+periodLength <- 10
+periodStarts <- seq(1990, 2030, periodLength)
+period <- .bincode(year, periodStarts, right=F)
+auctions$Period  <- as.factor(paste(
+  periodStarts[period],
+  "-", 
+  periodStarts[period]+periodLength-1))
 
-Az olvashatóság javítása érdekében az elfogadott mennyiségeket a táblázathoz képest milliárd forintban jelenítem meg.
+# 1 éves lejáratra kétféle jelölést használtak
+auctions$Tenor[auctions$Tenor=="12M"]<-"1Y"
 
-## Gyakoriság
-```{r include=FALSE}
+# https://akk.hu/statisztika/hozamok-indexek-forgalmi-adatok/referenciahozamok
+referenceBonds <- c("3M", "6M",
+                    "1Y", "3Y","5Y",
+                    "10Y", "15Y", "20Y",
+                    "other")
+# manuális rendezés:
+auctions$Tenor<- factor(auctions$Tenor,
+                        levels=referenceBonds)
+auctions$Tenor <- auctions$Tenor %>% replace_na(replace = "other")
+
+# Szűrés új kibocsátásokra és fix kamatozási kötvényekre
+issues<-auctions[auctions$Type=="ISSUE"
+                 & auctions$`Interest Type`!="Float",]
+```
+
+```{r bond5.filter, include=FALSE}
 bond5 <- issues[issues$Tenor == "5Y", c("Date", "Accepted (mln)", "Avg Yield (%)", "Period")]
 
 # Oszlopok nevét egyszerűsítem
@@ -162,10 +171,69 @@ colnames(bond5) <- c("Date", "AcceptedAmount", "Yield", "Period")
 
 # Olvashatóság miatt az elfogadott mennyiséget millárd forintban használom
 bond5$AcceptedAmount <- bond5$AcceptedAmount/1000
+
+# Sikeres kibocsátások:
+bond5successful <- bond5[bond5$AcceptedAmount>0, ]
 ```
-```{r echo=TRUE, message=TRUE}
-# binnedCounts(bond5$AcceptedAmount, breaks = 6)
+
+### Bepillantás végeredményként kapott adathalmazba:
+
+```{r glimpse}
+head(bond5)
+
+ggplot(data=bond5, aes(x=AcceptedAmount)) +
+  geom_histogram(bins=16)+
+  labs(title="Az elfogadott mennyiségek az 5 éves kötvények elsődleges kibocsátásakor",
+       x="Elfogadott mennyiség (milliárd Forint)",
+       y= "Gyakoriság (db)")
+
+ggplot(data=bond5successful, aes(x=Yield)) +
+  geom_histogram(bins=16)+
+  labs(title="Átlaghozamok az 5 éves kötvények elsődleges kibocsátásakor",
+       x="Átlaghozam (%)",
+       y= "Gyakoriság (db)")
 ```
+
+
+#  TODO  ###################x
+\newpage
+##########
+\newpage
+
+```{r}
+
+# install.packages("psych") # csúcsosság, ferdeség
+# install.packages("questionr") # Cramer
+# install.packages("lawstat") # levene.test
+library(tidyr, warn.conflicts = FALSE)
+library(psych, warn.conflicts = FALSE)
+library(rcompanion, warn.conflicts = FALSE)
+library(questionr, warn.conflicts = FALSE)
+library(lawstat, warn.conflicts = FALSE)
+```
+
+
+\newpage
+------------------------------
+\newpage
+#################
+\newpage
+# Probléma felvetése
+
+Célom a magyar államkötvények első forgalomba hozatalának vizsgálata. 
+
+Az első részben bemutatom az adat forrását és ismérveit. A második részben az 5 éves lejárat aukcióinak forgalmi adatait és az különböző lejáratok gyakoriságát vizsgáltam. A harmadik részben másik változót, a kötvény kibocsátáskori hozamát vizsgáltam, valamint ennek változását az elmúlt évtizedekben. Az 5 éves lejárat aukcióinak forgalmi és hozam adatait vizsgáltam. A negyedik részben két egymintás hipotézis vizsgálatot mutatok be. Az ötödik részben több változó kapcsolatát vizsgáltam. Az első példa két mennyiségi változó (lejárat és időszak). A második az időszak és hozam kapcsolatáról szól, a harmadik pedig a már külön vizsgált hozam és kibocsátott mennyiség viszonyát mutatja be.
+
+Meg kell jegyezni, hogy az ismérvek időfüggését figyelmen kívül hagytam és idő helyett nagyobb időszakokat, mint kategóriákat használtam. Mivel a táblázat az összes aukció adatát tartalmazza, ezért az intervallumbecslések feltételei automatikusan teljesülnek.
+
+
+
+
+
+# 2. Elsődleges piacon kibocsátott 5 éves államkötvények leíró statisztikája
+
+Az olvashatóság javítása érdekében az elfogadott mennyiségeket a táblázathoz képest milliárd forintban jelenítem meg.
+
 ## Hisztogram
 ```{r echo=FALSE, message=TRUE}
 ggplot(data=bond5, aes(x=AcceptedAmount)) +
@@ -212,7 +280,7 @@ korlat = Q3 + 1.5 * (Q3 - Q1)
 ```
 
 A kiugró értékek dátumai:
-```{r echo=FALSE, message=FALSE}
+  ```{r echo=FALSE, message=FALSE}
 bond5[bond5$AcceptedAmount>korlat, "Date"]
 ```
 A dátumokból látszik, hogy a nagyobb kibocsátások 2007-2008-as és 2020-as nehezebb időkben történek.
@@ -228,13 +296,13 @@ summary(auctions$Tenor)
 
 A hozamok vizsgálatakor csak a sikeres aukciókat érdemes figyelembe venni, amit az elfogadott mennyiség alapján lehet kiszűrni. Az 5 éves kötvény esetén ez megegyezik azzal a feltétellel, hogy az átlaghozam pozitív, de bízzunk benne, hogy egyszer nekünk is sikerül 0%-os hozammal forrást bevonni az 5 éves lejáraton. 
 <!-- Jelenleg a német 5 éves hozam -0.4%  -->
-
-```{r message=FALSE, include=FALSE}
+  
+  ```{r message=FALSE, include=FALSE}
 bond5successful <- bond5[bond5$AcceptedAmount>0, ]
 ```
 ```{r echo=FALSE, message=TRUE}
 ggplot(data=remove_missing(bond5successful, na.rm=TRUE, vars="Yield"),
-  aes(y=Yield, x=Period)) +
+       aes(y=Yield, x=Period)) +
   geom_boxplot() +
   labs(title="5 éves kötvények hozama",
        x="Időszak",
@@ -252,13 +320,13 @@ groupwiseMean(Yield ~ Period,
               na.rm=T)
 
 groupwiseMedian(Yield ~ Period,
-              data=bond5successful,
-              conf=0.95,
-              digits=3,
-              R = 1000,
-              percentile = TRUE,
-              bca = FALSE
-              )
+                data=bond5successful,
+                conf=0.95,
+                digits=3,
+                R = 1000,
+                percentile = TRUE,
+                bca = FALSE
+)
 ```
 
 A három periódusban rendre csökkent a hozam átlaga és mediánja is, a konfidencia-intervallumok között nincs átfedés. Érdekes, hogy mindhárom időszakban a medián kisebb, mint az átlag, a 90-es éveknél a doboz ábrán nem látszik feltűnő ferdeség.
@@ -275,13 +343,13 @@ Az alábbi ábrán a kibocsátott kötvények mennyisége látható az idő füg
 ggplot(data=bond5, aes(x=Date, y=AcceptedAmount)) +
   geom_point()+
   labs(title = "Kibocsátott 5 éves kötvények az idő függvényében",
-      x="Dátum",
-      y="Elfogadott mennyiség (Md forint)")
+       x="Dátum",
+       y="Elfogadott mennyiség (Md forint)")
 ```
 
 
 Az elmúlt időszak arányai:
-```{r echo=FALSE}
+  ```{r echo=FALSE}
 round(prop.table(table(issues[issues$Period=="2010 - 2019", "Tenor"]))*100, 1)
 ```
 
@@ -292,7 +360,7 @@ auctionTypes$fiveYear[auctionTypes$Tenor == "5Y"] <- 1
 ```
 
 Az ötéves aukciók aránya az egész mintában és időszakok szerint bontva:
-```{r echo=FALSE}
+  ```{r echo=FALSE}
 groupwiseMean(fiveYear ~ 1,
               data=auctionTypes,
               conf=0.95,
@@ -302,7 +370,7 @@ groupwiseMean(fiveYear ~ Period,
               conf = 0.95,
               digits = 3,
               na.rm = TRUE
-              )
+)
 ```
 A 2000-es és 2010-es évek között egyértelmű a különbség, a konfidencia-intervallumok távol vannak egymástól. A 2020-szal kezdődő időszakra nem egyértelmű az arány növekedése.
 
@@ -332,8 +400,8 @@ t.test(bond3$Rate, mu = 1, alternative = "less")
 A p-érték 1, vagyis bármely szignifikancia szint mellett elfogadjuk H0-t, az állítás stabil.
 
 A legfrissebb aukció eredménye itt érhető el:
-
-https://akk.hu/statistics/auction-results/discount-treasury-bill-auctions
+  
+  https://akk.hu/statistics/auction-results/discount-treasury-bill-auctions
 
 
 ## 2. hipotiézis vizsgálat
@@ -393,7 +461,7 @@ sprintf("H2: %s", 2143.8/ (2143.8 + 1672.6))
 A variancia-hányados 56.2%, a p-érték lényegében 0, kisebb 1% alfánál is, így H0 elutasítható, így a időszak és hozam kapcsolata erős és szignifikáns.
 
 Feltételek ellenőrzése:
-```{r echo=TRUE, warning=FALSE}
+  ```{r echo=TRUE, warning=FALSE}
 ks.test(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2000 - 2009",]$Yield, "pnorm")
 ```
 ```{r echo=FALSE}
@@ -425,10 +493,6 @@ sprintf("A két változó közötti korreláció: %s",
 summary(reg)
 ```
 
-```{stan output.var=proba}
-
-
-```
 
 
 A korreláció negatív és abszolút értéke kisebb 0.3-nál. A kapcsolat ellentétes, de gyenge. Nagyobb kereslethez magasabb ár tartozik, a kötvény ára és hozama között monoton csökkenő kapcsolat van. A p-érték 0.0004 1%-nál is kisebb, ezért elvetjük, hogy az egyenes meredeksége 0, így a kapcsolat szignifikáns.
