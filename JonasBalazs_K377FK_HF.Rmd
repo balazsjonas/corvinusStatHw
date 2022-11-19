@@ -9,8 +9,11 @@ output:
   pdf_document: default
 ---
 
-  
-```{r dependencies, message=TRUE, warning=FALSE, include=FALSE}
+
+```{r cache, include=FALSE}
+cache.enabled <- TRUE
+```
+```{r dependencies, message=TRUE, warning=FALSE, include=FALSE, cache=cache.enabled}
 install.packages('pacman')
 library(pacman)
 pacman::p_load(ggplot2,
@@ -95,6 +98,9 @@ Hasznosnak tartottam kiemelni a dátumból az évet. Ezt a dataframeben "Year"-n
 Az idő helyett 10 éves időszakokat vizsgáltam. Jelenleg diszjunkt időszakok, amelyeken a rendezés értelmezett, ezért tekinthető ordinális típusnak.
 
 
+Szintén számított oszlop a legkisebb és legnagyobb hozamú ajánlat különbsége, amit YieldSpreadnek neveztem el.
+
+
 ## Megjegyzések
 
 A dolgozatban csak az elsődleges kibocsátások (ISSUE) ismérveit fogom vizsgálni.
@@ -136,7 +142,7 @@ Csereaukciók: nem jut új forráshoz az állam, mind a vevő, mind az eladó r�
 
 Visszavásárlások: Ebben az esetben az állam vevő szerepében jelenik meg, gyakran a lejáratok előtt több részletben vásárolnak vissza kötvényeket
 
-```{r loading.excel, warning=FALSE, include=FALSE}
+```{r loading.excel, warning=FALSE, include=FALSE, cache=cache.enabled}
 ## Adatok betöltése és tisztítása ====
 auctions <- read_excel("AUCTION_220110173944.xlsx")
 auctions <- as.data.frame(auctions)
@@ -169,22 +175,25 @@ issues<-auctions[auctions$Type=="ISSUE"
                  & auctions$`Interest Type`!="Float",]
 ```
 
-```{r bond5.filter, include=FALSE}
+```{r bond5.filter, include=FALSE, cache=cache.enabled}
 bond5 <- issues[issues$Tenor == "5Y",
                 c( "Date", 
                   "Accepted (mln)", "Avg Yield (%)", # vizsgált mennyiségek
+                  "Announced (mln)",
                   "Min Yield (%)", "Max Yield (%)", #
                   "Min Price (%)", "Avg Price (%)", "Max Price (%)",
                   "Period")]
 
 # Oszlopok nevét egyszerűsítem
 colnames(bond5) <- c("Date", "AcceptedAmount", "Yield",
+                     "AnnouncedAmount",
                      "MinYield", "MaxYield",
                      "MinPrice", "AvgPrice", "MaxPrice",
                      "Period")
 
-# Olvashatóság miatt az elfogadott mennyiséget millárd forintban használom
+# Olvashatóság miatt az elfogadott és meghirdetett mennyiséget millárd forintban használom
 bond5$AcceptedAmount <- bond5$AcceptedAmount/1000
+bond5$AnnouncedAmount <- bond5$AnnouncedAmount/1000
 
 bond5$YieldSpread <- bond5$MaxYield - bond5$MinYield
 
@@ -272,41 +281,41 @@ A dátumokból látszik, hogy a nagyobb kibocsátások 2007-2008-as és 2020-as 
 Először az időszak, mint kategórikus változó és dátum nélkül.
 Ismert, hogy a hozam és árfolyam között determinisztikus kapcsolat van. A véletlen "zaj" abból adódik, hogy a konkrét értékpapír kíválasztása és annak cash-flowja előre nem ismert. A hozamok és árfolyamok között ezért jelentős negatív korreláció van. Amit érdemes megjegyezni, hogy a hozam és a spread közötti pozitív korrelációt.
 
-Az Államadósságkezelő igyekszik minél olcsóbban finanszírozni az országot, ami az elfogadott mennyiség és hozam közötti erős negatív korrelációban látszik. Ezt a kapcsolatot kicsit pontosabban is megvizsgálom.
+Az Államadósságkezelő igyekszik minél olcsóbban finanszírozni az országot, ami az elfogadott mennyiség és hozam közötti erős negatív korrelációban látszik. Nem meglepő a meghirdetett és elfogadott mennyiségek közötti erős korreláció sem.
 
 ```{r corr}
 cor(select(bond5,-Period, -Date ))
 corPlot(select(bond5,-Period, -Date ))
 ```
-A két változó között gyenge negatív kapcsolat van. A Pearson korrelációhoz tartozó p érték alapján elvethetjük, hogy a lineáris korreláció nulla lenne. A Spearman korrelációnál hasonló eredményt kapunk.
+<!-- A két változó között gyenge negatív kapcsolat van. A Pearson korrelációhoz tartozó p érték alapján elvethetjük, hogy a lineáris korreláció nulla lenne. A Spearman korrelációnál hasonló eredményt kapunk. -->
 
-```{r corr}
-cor(select(bond5,-Period, -Date ))
-corPlot(select(bond5, -Period, -Date))
-ggplot(bond5, aes(x=Yield, y=AcceptedAmount)) +
-  geom_point() +
-  geom_smooth(method=lm)
+<!-- ```{r corr2} -->
+<!-- cor(select(bond5,-Period, -Date )) -->
+<!-- corPlot(select(bond5, -Period, -Date)) -->
+<!-- ggplot(bond5, aes(x=Yield, y=AcceptedAmount)) + -->
+<!--   geom_point() + -->
+<!--   geom_smooth(method=lm) -->
 
-cor.test(bond5$Yield, bond5$AcceptedAmount, method='pearson')
-cor.test(bond5$Yield, bond5$AcceptedAmount, method='spearman', exact = FALSE)
+<!-- cor.test(bond5$Yield, bond5$AcceptedAmount, method='pearson') -->
+<!-- cor.test(bond5$Yield, bond5$AcceptedAmount, method='spearman', exact = FALSE) -->
 
-# pairs.panels(bond5)
+<!-- # pairs.panels(bond5) -->
 
-```
+<!-- ``` -->
 ## Lineáris regresszió
 
-## TODO ezt sokkal előbbre
 ```{r linreg}
-lm1 <- lm(AcceptedAmount ~ Yield + MinYield + MaxYield +
+lm1 <- lm(Yield ~ AcceptedAmount + AnnouncedAmount + MinYield + MaxYield +
             MinPrice + AvgPrice + MaxPrice +
             YieldSpread,
           data=bond5)
 summary(lm1)
 
-lm2 <- lm(AcceptedAmount ~ YieldSpread + Yield, data=bond5)
-summary(lm2)
 
 ```
+# TODO változószelekció
+
+## TODO melyiket tartsuk meg.
 
 # TODO: Kilógó értékek, Winsorizált átlag, HuberM
 
@@ -349,8 +358,8 @@ Az olvashatóság javítása érdekében az elfogadott mennyiségeket a tábláz
 
 A hozamok vizsgálatakor csak a sikeres aukciókat érdemes figyelembe venni, amit az elfogadott mennyiség alapján lehet kiszűrni. Az 5 éves kötvény esetén ez megegyezik azzal a feltétellel, hogy az átlaghozam pozitív, de bízzunk benne, hogy egyszer nekünk is sikerül 0%-os hozammal forrást bevonni az 5 éves lejáraton. 
 <!-- Jelenleg a német 5 éves hozam -0.4%  -->
-  
-  ```{r message=FALSE, include=FALSE}
+
+```{r message=FALSE, include=FALSE}
 bond5successful <- bond5[bond5$AcceptedAmount>0, ]
 ```
 ```{r echo=FALSE, message=TRUE}
@@ -402,7 +411,7 @@ ggplot(data=bond5, aes(x=Date, y=AcceptedAmount)) +
 
 
 Az elmúlt időszak arányai:
-  ```{r echo=FALSE}
+```{r echo=FALSE}
 round(prop.table(table(issues[issues$Period=="2010 - 2019", "Tenor"]))*100, 1)
 ```
 
@@ -413,7 +422,7 @@ auctionTypes$fiveYear[auctionTypes$Tenor == "5Y"] <- 1
 ```
 
 Az ötéves aukciók aránya az egész mintában és időszakok szerint bontva:
-  ```{r echo=FALSE}
+```{r echo=FALSE}
 groupwiseMean(fiveYear ~ 1,
               data=auctionTypes,
               conf=0.95,
@@ -514,7 +523,7 @@ sprintf("H2: %s", 2143.8/ (2143.8 + 1672.6))
 A variancia-hányados 56.2%, a p-érték lényegében 0, kisebb 1% alfánál is, így H0 elutasítható, így a időszak és hozam kapcsolata erős és szignifikáns.
 
 Feltételek ellenőrzése:
-  ```{r echo=TRUE, warning=FALSE}
+```{r echo=TRUE, warning=FALSE}
 ks.test(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2000 - 2009",]$Yield, "pnorm")
 ```
 ```{r echo=FALSE}
