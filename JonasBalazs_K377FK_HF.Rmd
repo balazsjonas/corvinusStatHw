@@ -5,13 +5,13 @@ title: |-
 author: "Balázs Jónás"
 date: "`r Sys.Date()`"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 
 ```{r cache, include=FALSE}
-cache.enabled <- TRUE
+cache.enabled <- FALSE
 ```
 ```{r dependencies, message=TRUE, warning=FALSE, include=FALSE, cache=cache.enabled}
 install.packages('pacman')
@@ -20,7 +20,7 @@ pacman::p_load(ggplot2,
                magrittr, # pipe
                tidyr, # replace_na
                dplyr, # select
-               psych, # descibe, winsor.mean, winsor.sd
+               psych, # describe, winsor.mean, winsor.sd
                rcompanion, #groupwiseMean
                readxl # read_excel
                )
@@ -176,32 +176,34 @@ issues<-auctions[auctions$Type=="ISSUE"
 ```
 
 ```{r bond5.filter, include=FALSE, cache=cache.enabled}
+issues$YieldSpread <- issues$`Max Yield (%)` - issues$`Min Yield (%)`
 bond5 <- issues[issues$Tenor == "5Y",
-                c( "Date", 
-                  "Accepted (mln)", "Avg Yield (%)", # vizsgált mennyiségek
-                  "Announced (mln)",
-                  "Min Yield (%)", "Max Yield (%)", #
-                  "Min Price (%)", "Avg Price (%)", "Max Price (%)",
+                c("Date",
+                  "Avg Yield (%)", "Accepted (mln)", # elsődlegesen vizsgált mennyiségek
+                  "Announced (mln)", "Bid Amount (mln)",
+                  "Min Yield (%)", "Max Yield (%)",
+                  "Avg Price (%)", "Min Price (%)","Max Price (%)",
+                  "YieldSpread",
                   "Period")]
 
 # Oszlopok nevét egyszerűsítem
-colnames(bond5) <- c("Date", "AcceptedAmount", "Yield",
-                     "AnnouncedAmount",
+colnames(bond5) <- c("Date", "Yield", "Accepted",
                      "MinYield", "MaxYield",
-                     "MinPrice", "AvgPrice", "MaxPrice",
-                     "Period")
+                     "Announced", "BidAmount", "AvgPrice", "MinPrice", "MaxPrice",
+                     "YieldSpread", "Period")
 
 # Olvashatóság miatt az elfogadott és meghirdetett mennyiséget millárd forintban használom
-bond5$AcceptedAmount <- bond5$AcceptedAmount/1000
-bond5$AnnouncedAmount <- bond5$AnnouncedAmount/1000
+bond5$Accepted <- bond5$Accepted/1000
+bond5$Announced <- bond5$Announced/1000
+bond5$BidAmount <- bond5$BidAmount/1000
 
-bond5$YieldSpread <- bond5$MaxYield - bond5$MinYield
 
 # Sikeres kibocsátások:
-bond5 <- bond5[bond5$AcceptedAmount>0, ]
+bond5 <- bond5[bond5$Accepted>0, ]
 ```
 
 ## Bepillantás végeredményként kapott adathalmazba:
+
 
 ```{r glimpse}
 head(bond5)
@@ -230,49 +232,55 @@ print(t(descYield), digits = 2)
 print(paste('winsorizált átlag:', round(winsor.mean(bond5$Yield, trim = 0.1),2)))
 print(paste('winsorizált szórás:', round(winsor.sd(bond5$Yield, trim = 0.1),2)))
 
-
 ggplot(data=bond5, aes(x=Yield)) +
-  geom_histogram(bins=16)+
-  labs(title="Átlaghozamok az 5 éves kötvények elsődleges kibocsátásakor",
-       x="Átlaghozam (%)",
-       y= "Gyakoriság (db)")
+  # geom_histogram(bins=16)+
+  geom_histogram(aes(y=..density..)) +
+  geom_density(bw=0.3) +
+  labs(title="Average yield of 5-year bonds at issue", # UTF-8 feliratot nem sikerült megoldani
+       x="Average yield (%)",
+       y= "Relative frequency")
 
 ggplot(data=bond5, aes(x=Yield)) +
   geom_boxplot() +
   coord_flip() +
-  labs(title="Átlaghozamok az 5 éves kötvények elsődleges kibocsátásakor",
-       x="Átlaghozam (%)",
-       y= "")
+  labs(title = "Average yield of 5-year bonds at issue",
+       x = "Average yield (%)"
+       )
   
-
+# 
+# ggplot(data=bond5, aes(x=Yield)) +
+#   geom_density(bw=0.1) +
+#   labs(title="Kernel density becslő (bw=0.1)",
+#        x="Átlaghozam (%)",
+#        y= "Relatív gyakoriság")
 ```
 ## Elfogadott mennyiségek
 
 Mivel csak a sikeres aukciókat vizsgálom, ezért a minimum nem nulla lesz, viszont találunk néhány kiugró értéket. Az eloszlás kissé jobbra elnyúló, normálishoz képest csúcsosabb, nem normális eloszlású.
 
 ```{r hist}
-descAmount <- describe(bond5$AcceptedAmount, quant=c(0.25, 0.5, 0.75))
+descAmount <- describe(bond5$Accepted, quant=c(0.25, 0.5, 0.75))
 print(t(descAmount))
 
-ggplot(data=bond5, aes(x=AcceptedAmount)) +
+ggplot(data=bond5, aes(x=Accepted)) +
   geom_histogram(bins=16)+
-  labs(title="Az elfogadott mennyiségek az 5 éves kötvények elsődleges kibocsátásakor",
-       x="Elfogadott mennyiség (milliárd Forint)",
-       y= "Gyakoriság (db)")
+  labs(title="Accepted amounts of 5Y bonds",
+       x="Accepted amount (bn. HUF)",
+       y= "Frequency")
 
 
-ggplot(data=bond5, aes(x=AcceptedAmount)) +
+ggplot(data=bond5, aes(x=Accepted)) +
   geom_boxplot() +
   coord_flip() +
-  labs(#title="Átlaghozamok az 5 éves kötvények elsődleges kibocsátásakor",
-       x="Elfogadott mennyiség (milliárd Forint)",
+  labs(
+       x="Accepted amount (bn. HUF)",
        y= "")
 
 print(paste("Outlierek száma: ",
-  sum(bond5$AcceptedAmount>mean(bond5$AcceptedAmount) + 1.5*IQR(bond5$AcceptedAmount))))
+  sum(bond5$Accepted>mean(bond5$Accepted) + 1.5*IQR(bond5$Accepted))))
 
 print("A kiugró értékek dátumai:")
-bond5[bond5$AcceptedAmount>mean(bond5$AcceptedAmount) + 1.5*IQR(bond5$AcceptedAmount), "Date"]
+bond5[bond5$Accepted>mean(bond5$Accepted) + 1.5*IQR(bond5$Accepted), "Date"]
 ```
 A dátumokból látszik, hogy a nagyobb kibocsátások 2007-2008-as és 2020-as nehezebb időkben történek.
 
@@ -283,9 +291,9 @@ Ismert, hogy a hozam és árfolyam között determinisztikus kapcsolat van. A v�
 
 Az Államadósságkezelő igyekszik minél olcsóbban finanszírozni az országot, ami az elfogadott mennyiség és hozam közötti erős negatív korrelációban látszik. Nem meglepő a meghirdetett és elfogadott mennyiségek közötti erős korreláció sem.
 
-```{r corr}
-cor(select(bond5,-Period, -Date ))
-corPlot(select(bond5,-Period, -Date ))
+```{r corr, cache=cache.enabled}
+print(cor(select(bond5,-Period, -Date )), digits = 1)
+corPlot(select(bond5,-Period, -Date ), FALSE)
 ```
 <!-- A két változó között gyenge negatív kapcsolat van. A Pearson korrelációhoz tartozó p érték alapján elvethetjük, hogy a lineáris korreláció nulla lenne. A Spearman korrelációnál hasonló eredményt kapunk. -->
 
@@ -305,10 +313,12 @@ corPlot(select(bond5,-Period, -Date ))
 ## Lineáris regresszió
 
 ```{r linreg}
-lm1 <- lm(Yield ~ AcceptedAmount + AnnouncedAmount + MinYield + MaxYield +
-            MinPrice + AvgPrice + MaxPrice +
+lm1 <- lm(Yield ~ Accepted + Announced + BidAmount +
+            AvgPrice +MinPrice+MaxPrice +
+            MinYield + MaxYield +
             YieldSpread,
           data=bond5)
+
 summary(lm1)
 
 
@@ -343,17 +353,6 @@ Célom a magyar államkötvények első forgalomba hozatalának vizsgálata.
 
 Az első részben bemutatom az adat forrását és ismérveit. A második részben az 5 éves lejárat aukcióinak forgalmi adatait és az különböző lejáratok gyakoriságát vizsgáltam. A harmadik részben másik változót, a kötvény kibocsátáskori hozamát vizsgáltam, valamint ennek változását az elmúlt évtizedekben. Az 5 éves lejárat aukcióinak forgalmi és hozam adatait vizsgáltam. A negyedik részben két egymintás hipotézis vizsgálatot mutatok be. Az ötödik részben több változó kapcsolatát vizsgáltam. Az első példa két mennyiségi változó (lejárat és időszak). A második az időszak és hozam kapcsolatáról szól, a harmadik pedig a már külön vizsgált hozam és kibocsátott mennyiség viszonyát mutatja be.
 
-# 2. Elsődleges piacon kibocsátott 5 éves államkötvények leíró statisztikája
-
-Az olvashatóság javítása érdekében az elfogadott mennyiségeket a táblázathoz képest milliárd forintban jelenítem meg.
-
-
-
-
-
-
-
-
 # 3. Az 5 éves államkötvények hozamának vizsgálata az időszak függvényében
 
 A hozamok vizsgálatakor csak a sikeres aukciókat érdemes figyelembe venni, amit az elfogadott mennyiség alapján lehet kiszűrni. Az 5 éves kötvény esetén ez megegyezik azzal a feltétellel, hogy az átlaghozam pozitív, de bízzunk benne, hogy egyszer nekünk is sikerül 0%-os hozammal forrást bevonni az 5 éves lejáraton. 
@@ -372,113 +371,22 @@ ggplot(data=remove_missing(bond5successful, na.rm=TRUE, vars="Yield"),
 ```
 
 
-## Az átlag hozam becslése időszakok szerint bontva
-
-```{r echo=TRUE, message=TRUE}
-groupwiseMean(Yield ~ Period,
-              data=bond5successful,
-              conf=0.95,
-              digits=3,
-              na.rm=T)
-
-groupwiseMedian(Yield ~ Period,
-                data=bond5successful,
-                conf=0.95,
-                digits=3,
-                R = 1000,
-                percentile = TRUE,
-                bca = FALSE
-)
-```
-
-A három periódusban rendre csökkent a hozam átlaga és mediánja is, a konfidencia-intervallumok között nincs átfedés. Érdekes, hogy mindhárom időszakban a medián kisebb, mint az átlag, a 90-es éveknél a doboz ábrán nem látszik feltűnő ferdeség.
-
-
 ## Lejáratok aránya különböző időszakokban
 
-A kibocsátó érdekelt az átlagos hátralévő futamidő növelésében, mivel ez csökkenti a finanszírozás kockázatait (pl megújítási kockázat, kamatkiadások kockázata). Ez a cél támogatható rövid hátralévő lejáratú kötvények visszavásárlásával vagy cseréjével, vagy éppen a hosszabb lejáratok előnyben részesítése.
+
 
 Az alábbi ábrán a kibocsátott kötvények mennyisége látható az idő függvényében. 2009 körül startégiaváltás vehető észre: gyakoribb aukciók során kisebb mennyiségek kibocsátása. Ezzel valószínűleg jobban kontrollálható a kockázat és költség.
 
 
 ```{r echo=FALSE}
-ggplot(data=bond5, aes(x=Date, y=AcceptedAmount)) +
+ggplot(data=bond5, aes(x=Date, y=Accepted)) +
   geom_point()+
-  labs(title = "Kibocsátott 5 éves kötvények az idő függvényében",
-       x="Dátum",
-       y="Elfogadott mennyiség (Md forint)")
+  labs(title = "accepted vs time",
+       x="Date",
+       y="Accepted (bn.)")
 ```
 
 
-Az elmúlt időszak arányai:
-```{r echo=FALSE}
-round(prop.table(table(issues[issues$Period=="2010 - 2019", "Tenor"]))*100, 1)
-```
-
-```{r include=FALSE}
-auctionTypes <- issues[, c("Period", "Tenor") ]
-auctionTypes$fiveYear <- 0
-auctionTypes$fiveYear[auctionTypes$Tenor == "5Y"] <- 1
-```
-
-Az ötéves aukciók aránya az egész mintában és időszakok szerint bontva:
-```{r echo=FALSE}
-groupwiseMean(fiveYear ~ 1,
-              data=auctionTypes,
-              conf=0.95,
-              digits=3)
-groupwiseMean(fiveYear ~ Period,
-              data=auctionTypes, 
-              conf = 0.95,
-              digits = 3,
-              na.rm = TRUE
-)
-```
-A 2000-es és 2010-es évek között egyértelmű a különbség, a konfidencia-intervallumok távol vannak egymástól. A 2020-szal kezdődő időszakra nem egyértelmű az arány növekedése.
-
-
-
-# 4. Egymintás hipotézisvizsgálat
-
-## 1. hipotézis vizsgálat
-
-Igaz-e, hogy az Államadósság Kezelő több ajánlatot fogad el, mint amennyit meghirdet. Ez átfogalmazva azt jelenti, hogy az elfogadott és meghirdetett mennyiség hányadosa nagyobb mint 1.
-
-```{r include=FALSE}
-bond3 <- issues[issues$Tenor=="3M",]
-bond3$Rate <- bond3$`Accepted (mln)`/bond3$`Announced (mln)`
-```
-
-Állítás: elfogadott / meghirdetett > 1
-
-H0: mu = 1
-
-H1: mu <1
-
-```{r echo=TRUE}
-t.test(bond3$Rate, mu = 1, alternative = "less")
-```
-
-A p-érték 1, vagyis bármely szignifikancia szint mellett elfogadjuk H0-t, az állítás stabil.
-
-A legfrissebb aukció eredménye itt érhető el:
-  
-  https://akk.hu/statistics/auction-results/discount-treasury-bill-auctions
-
-
-## 2. hipotiézis vizsgálat
-
-Igaz-e, hogy az 5 éves hozamok mediánja 4.9%? Ahogy korábban láttuk a 2000-es évek és 2010-es évek átlaghozama jelentősen eltér. Az egész időszakra nézve az eloszlás bimodális.
-
-H0: median == 4.9
-
-H1: median != 4.9
-
-```{r echo=TRUE}
-wilcox.test(bond5$Yield, mu=4.9, exact=FALSE)
-```
-
-A p-érték 0.54, elfogadjuk H0-t.
 
 
 # 5. Kétváltozós kapcsoslatvizsgálat
@@ -490,9 +398,9 @@ ggplot(data=subset(issues,issues$`Accepted (mln)`> 0 ),
        aes(x=Period, fill =Tenor)) +
   geom_bar(position="fill") +
   scale_fill_brewer(palette="Dark2") +
-  labs(title="Lejáratok aránya",
-       x="Arány (%)",
-       y="Időszak")
+  labs(title="Ratio of tenors",
+       x="Ratio (%)",
+       y="Period")
 ```
 
 Az 5 és 10 éves lejáratok aránya emelkedett a három időszak folyamán, míg a 3 hónapos és 1 éves kötvények aránya jelentősen nem változott. Néhány évre bevezetésre került a 20 éves referencia kötvény is.
@@ -514,7 +422,7 @@ A p-érték lényegében 0-nak tekinthető, ezért semmilyen alfa érték mellet
 ## Időszak és hozam kapcsolata
 
 ```{r echo=FALSE}
-aov(Yield ~ Period, data=bond5[bond5$AcceptedAmount>0,])
+aov(Yield ~ Period, data=bond5[bond5$Accepted>0,])
 sprintf("Between: %s", 2143.8)
 sprintf("Residuals: %s", 1672.6)
 sprintf("H2: %s", 2143.8/ (2143.8 + 1672.6))
@@ -524,13 +432,13 @@ A variancia-hányados 56.2%, a p-érték lényegében 0, kisebb 1% alfánál is,
 
 Feltételek ellenőrzése:
 ```{r echo=TRUE, warning=FALSE}
-ks.test(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2000 - 2009",]$Yield, "pnorm")
+ks.test(bond5[bond5$Accepted>0 & bond5$Period=="2000 - 2009",]$Yield, "pnorm")
 ```
 ```{r echo=FALSE}
 sprintf("2000-2009-es időszak hozamainak szórása: %s",
-        sd(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2000 - 2009",]$Yield))
+        sd(bond5[bond5$Accepted>0 & bond5$Period=="2000 - 2009",]$Yield))
 sprintf("2010-2019-es időszak hozamainak szórása: %s",
-        sd(bond5[bond5$AcceptedAmount>0 & bond5$Period=="2010 - 2019",]$Yield))
+        sd(bond5[bond5$Accepted>0 & bond5$Period=="2010 - 2019",]$Yield))
 
 ```
 A Kolmogorov-Smirnov-teszt szerint a p-érték lényegében 0, ezért a null-hipotézist el kell vetnünk, vagyis az első időszakban a hozamok nem normális eloszlásúak. Az azonos szórás feltétele is sérül. Ezek miatt a korábban számított p-érték nem megbízható.
@@ -541,7 +449,7 @@ A Kolmogorov-Smirnov-teszt szerint a p-érték lényegében 0, ezért a null-hip
 Utolsó vizsgálat tárgya a kötvények mennyiségének és hozamának kapcsolata
 
 ```{r echo=FALSE}
-ggplot(data=bond5, aes(x=AcceptedAmount, y=Yield)) +
+ggplot(data=bond5, aes(x=Accepted, y=Yield)) +
   geom_point() +
   geom_line()+
   labs("Hozam és elfogadott mennyiség kapcsolata\n5 éves kötvények aukcióján",
@@ -550,8 +458,8 @@ ggplot(data=bond5, aes(x=AcceptedAmount, y=Yield)) +
 ```
 ```{r echo=FALSE}
 sprintf("A két változó közötti korreláció: %s",
-        cor(bond5$AcceptedAmount, bond5$Yield))
-(reg <- lm(Yield ~ AcceptedAmount, bond5))
+        cor(bond5$Accepted, bond5$Yield))
+(reg <- lm(Yield ~ Accepted, bond5))
 summary(reg)
 ```
 
