@@ -295,6 +295,39 @@ Az Államadósságkezelő igyekszik minél olcsóbban finanszírozni az országo
 print(cor(select(bond5,-Period, -Date )), digits = 1)
 corPlot(select(bond5,-Period, -Date ), FALSE)
 ```
+
+## Átlaghozam vs elfogadott mennyiség
+
+
+Az Államadósság kezelő által befolyásolható mennyiség hozam és az elfogadott mennyiség. Mint korábban láttuk a kettő között gyenge negatív korreláció van. Ez azért meglepő, mert az ÁKK a legkisebb hozamútól kezdve sorban fogadja el az egyre nagyobb hozamú (kisebb árfolyamú) ajánlatokat a stratégiája által meghatározott mértékig. Magyarázat lehet, hogy különböző aukciókra különböző ajánlatok érkeznek
+
+<!-- Ideális esetben miután 11 óra körül beérkeztek az ajánlatok, a legmagasabb árfolyamtól kezdve fogadja el az ajánlatokat a stratégiája által meghatározott mértékig, amivel az átlagos árfolyam csökken, az átlagos hozam pedig nő. -->
+
+```{r y.vs.acc}
+ggplot(bond5, aes(Yield, Accepted)) +
+  geom_point() +
+  geom_density2d() +
+  geom_density2d_filled(alpha=0.5)
+```
+
+## kmeans
+
+## PCA
+
+### TODO megfelelő mérték
+
+## szines mátrix :-)
+
+
+```{r tree}
+kmeans()
+
+bond5sampled <- sample_n(bond5, 200)
+plot(scale(bond5sampled))
+bond5sampled <- bond5sampled[,c('Accepted', 'Yield')]
+fifa_dist<-dist(bond5sampled, method="euclidean") # kiszámoljuk a mintába került elemek közötti távolságot
+heatmap(as.matrix(fifa_dist)) # hőtérképet rajzolunk
+```
 <!-- A két változó között gyenge negatív kapcsolat van. A Pearson korrelációhoz tartozó p érték alapján elvethetjük, hogy a lineáris korreláció nulla lenne. A Spearman korrelációnál hasonló eredményt kapunk. -->
 
 <!-- ```{r corr2} -->
