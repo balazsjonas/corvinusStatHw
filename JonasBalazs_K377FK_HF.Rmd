@@ -367,10 +367,17 @@ ggplot(bond5, aes(x=Date, y=Accepted)) +
 
 ## Lineáris regresszió
 
+### TODO multikollenaritás ellenőrzése, 
+
+### változószelekció --> X mátrix rangja!!!
+
+magas R^2>0.9 tautológia gyanús
+
 Tudjuk, hogy változók között erős korrelációk vannak, ezért a mRMR és forward módszerrel próbálom kiválasztani a szükségeseket. Jelen esetben a forward módszer módszer ad jobb eredményt, amit a két AIC érték viszonyából látunk.
 
 ```{r condi}
 X <- as.matrix(dplyr::select(bond5numeric,-Yield))
+qr(t(A)%*%A)$rank == min(dim(t(A)%*%A))
 
 lambda <- eigen(t(X) %*% X)$values
 print(paste('Condition number:', max(lambda) / min(lambda))) # -> meg sem próbálom invertálni
