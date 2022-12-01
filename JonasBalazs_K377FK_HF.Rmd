@@ -21,7 +21,7 @@ pacman::p_load(ggplot2,
                tidyr, # replace_na
                dplyr, # select
                psych, # describe, winsor.mean, winsor.sd
-               rcompanion, #groupwiseMean
+               rcompanion, #groupwiseMean, cramerV
                MASS, # stepAIC
                mRMRe, # mRMR.data
                readxl # read_excel
@@ -356,7 +356,14 @@ ggplot(bond5, aes(x=Date, y=Accepted)) +
   geom_point() +
   labs(title = "Issued ammounts during time")
 
+head(kmeans_plot)
+cramerV(kmeans_plot$Period, kmeans_plot$cluster)
+
+
+
 ```
+
+
 ## PCA
 
 ### TODO megfelelő mérték
