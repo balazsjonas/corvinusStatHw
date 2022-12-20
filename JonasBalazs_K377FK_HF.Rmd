@@ -28,26 +28,19 @@ pacman::p_load(ggplot2,
                )
 ```
 
-# TODO
-
-## Adatok frissítése
-
-
-## outlier, winsorized mean
-
-
-
 # Probléma felvetése
 
 
 Célom a magyar államkötvények első forgalomba hozatalának vizsgálata.
 
-Az első részben bemutatom az adat forrását és ismérveit, valamint az adattisztítás lépéseit. Elsősorban az 5 éves lejárat aukcióinak forgalmi adatait és hozamait fogom vizsgálni.
+Az első részben bemutatom az adat forrását és ismérveit, valamint az adattisztítás lépéseit. A második részben az 5 éves lejárat aukcióinak forgalmi adatait és hozamait fogom vizsgálni. A harmadik részben a kettő kapcsolatával foglalkozom.
+A negyedik részben beszerezhető adatokból igyekszem kiválasztani azokat, amik legjobban tudják előrejelezni az aukció eredményét.
 
-Meg kell jegyezni, hogy az ismérvek időfüggését figyelmen kívül hagytam és idő helyett nagyobb időszakokat, mint kategóriákat használtam. Mivel a táblázat az összes aukció adatát tartalmazza, nem történt mintavételezés, ezért az intervallumbecslések feltételei automatikusan teljesülnek.
+Meg kell jegyezni, hogy az ismérvek időfüggését figyelmen kívül hagytam és idő helyett nagyobb időszakokat, mint kategóriákat használtam. Mivel a táblázat az összes aukció adatát tartalmazza, nem történt mintavételezés.
 
 
-# Adatok forrása és feldolgozása
+
+# 1. Adatok forrása és feldolgozása
 
 
 Forrás: https://akk.hu/statistics/historical-data
@@ -210,11 +203,10 @@ bond5numeric <- dplyr::select(bond5,-Period, -Date ) # hidden by MASS::select
 head(bond5)
 ```
 
+# 2. Az 5 éves kötvények forgalmi adatainak leíró statisztikája
 
-# 5 éves kötvények bemutatása
 
-
-A következőkben a két vizsgált mennyiséget az elfogadott mennyiség és hozamot mutatom be, majd az aukción elért hozamot vizsgálom alaposabban..
+A következőkben a két vizsgált mennyiséget az elfogadott mennyiség és hozamot mutatom be, majd az aukción elért hozamot vizsgálom alaposabban.
 
 Az Államadósságkezelőnek korlátozottan, de van mozgástere az aukciók során. Aukció előtt a finanszírozási igény alapján meghatározzák a meghirdetett mennyiséget és a futamidőt. Az aukció elfogadásakor az mennyiséggel tudja kontrollálni az átlagos hozamot vagy eredménytelennek nyilváníthatja az aukciót. (Két alkalommal fordult elő, hogy a meghirdetett mennyiség kétszeresét fogadta el). Feltehetően az ÁKK már jól ismeri az elsődleges forgalmazókat és ezt is figyelembe tudják venni a meghirdetett mennyiség meghatározásakor.
 
@@ -230,10 +222,6 @@ A hozamok eloszlása bimodális, ami a hisztogramon látszik a legjobban. A hoza
 ```{r yields}
 descYield <- describe(bond5$Yield, quant=c(0.25, 0.5, 0.75))
 print(t(descYield), digits = 2)
-
-# print(paste('HuberM:', round(HuberM(bond5$Yield),2)))
-print(paste('winsorizált átlag:', round(winsor.mean(bond5$Yield, trim = 0.1),2)))
-print(paste('winsorizált szórás:', round(winsor.sd(bond5$Yield, trim = 0.1),2)))
 
 ggplot(data=bond5, aes(x=Yield)) +
   geom_histogram(aes(y=..density..)) +
@@ -260,11 +248,18 @@ ggplot(data=bond5, aes(x=Yield)) +
 
 ## Elfogadott mennyiségek
 
-Mivel csak a sikeres aukciókat vizsgálom, ezért a minimum nem nulla lesz, viszont találunk néhány kiugró értéket. Az eloszlás kissé jobbra elnyúló, normálishoz képest csúcsosabb, nem normális eloszlású.
+Mivel csak a sikeres aukciókat vizsgálom, ezért a minimum nem nulla lesz, viszont találunk néhány kiugróan magas értéket. Később látni fogjuk, hogy ezek valóban nem normál piaci körülmények között alakultak ki. A dátumokból látszik, hogy a nagyobb kibocsátások 2007-2008-as és 2020-as nehezebb időkben történek. 
+
+Emiatt érdemes valamilyen korrekciót alkalmazni az átlag számításnál. Az outlierek is értékes információval bírnak, ezért trimmelés helyett winsorizált átlagot és szórást fogom kiszámolni. 
+
+Az eloszlás kissé jobbra elnyúló, normálishoz képest csúcsosabb, nem normális eloszlású.
 
 ```{r hist}
 descAmount <- describe(bond5$Accepted, quant=c(0.25, 0.5, 0.75))
 print(t(descAmount))
+
+print(paste('winsorizált átlag:', round(winsor.mean(bond5$Accepted, trim = 0.1),2)))
+print(paste('winsorizált szórás:', round(winsor.sd(bond5$Accepted, trim = 0.1),2)))
 
 ggplot(data=bond5, aes(x=Accepted)) +
   geom_histogram(bins=16)+
@@ -286,8 +281,78 @@ print(paste("Outlierek száma: ",
 print("A kiugró értékek dátumai:")
 bond5[bond5$Accepted>mean(bond5$Accepted) + 1.5*IQR(bond5$Accepted), "Date"]
 ```
-A dátumokból látszik, hogy a nagyobb kibocsátások 2007-2008-as és 2020-as nehezebb időkben történek.
 
+
+
+
+# 3. Hozam és mennyiség viszonya az 5 éves kötvények esetén
+
+ 
+Az Államadósság kezelő által befolyásolható mennyiség hozam és az elfogadott mennyiség. A két mennyiség között gyenge negatív korreláció van. A p-érték 0.0002 1%-nál is kisebb, ezért elvetjük, hogy az egyenes meredeksége 0, így a kapcsolat szignifikáns.
+
+Ennek egy lehetséges magyarázata, hogy több benyújtott ajánlat azt jelzi, hogy a befektetők kevésbé tartják kockázatosnak a magyar kötvényeket amivel együtt kisebb kockázati felárat várnak. 
+
+
+```{r }
+cor.test(bond5numeric$Yield, bond5numeric$Accepted)
+```
+
+```{r y.vs.acc}
+ggplot(bond5, aes(Yield, Accepted)) +
+  geom_point() +
+  geom_density2d() +
+  geom_density2d_filled(alpha=0.5) 
+```
+
+## Klaszterelemzés
+
+A pontok 3 csoportba tömörülnek. Ezt a három csoportot kmeans módszerrel próbálom szétválasztani, majd összevetem egy eddig nem használt változóval, az időszakkal.
+
+A 2000 évekre a magas hozamok voltak jellemzőek, a 2010-es években megjeltek az alacsonyabb hozamok. A 2020-as éveknek csak az elején vagyunk, ezért nem hasonlítanám a másik kettőhöz. A legalsó grafikonon látszik, hogy a 2008-9-es válság után láthatóan megváltozott az ÁKK stratégiája. Nagyobb kibocsátások helyett a jobban kontrollálható és kisebb kockázatot jelentő módon gyakrabban, de kisebb összegeket hirdet meg.
+
+```{r kmeans}
+k <- kmeans(scale(bond5numeric[,c("Yield", "Accepted")]), centers=3)
+kmeans_plot <- bond5numeric
+kmeans_plot$cluster <- as.factor(k$cluster)
+
+ggplot(kmeans_plot, aes(x=Yield, y=Accepted)) +
+  geom_point(aes(colour=factor(cluster)))
+
+
+  
+  
+
+# pc <- prcomp(t(scale(bond5numeric)))
+# pc <- cbind(pc$rotation[,1], pc$rotation[,2], kmeans_plot$kmeans)
+# pc.df <- data.frame(pc$rotation[,1], pc$rotation[,2], kmeans_plot$kmeans)
+# 
+# plot(pc.df[,1], pc.df[,2], col=pc.df[,3])
+# plot(pc[,1], pc[,2], col=pc[,3])
+# ggplot(data.frame(pc$rotation), aes(x=PC1, y=PC3)) +
+#   geom_point()
+ggplot(bond5, aes(x=Date, y=Accepted)) +
+  geom_point() +
+  labs(title = "Issued ammounts during time")
+
+head(kmeans_plot)
+
+
+
+```
+
+Felmerült bennem az a lehetőség, hogy a k-means algoritmus által "megtalált" csoportok időszakonként megváltoztak. A két kategórikus változó vizsgálatára a Cramer-V együttható ad megoldást. Az értéke 0.58, ami közepesen erős kapcsolatra utal. További kérdés, hogy a "sokaságban", vagyis a későbbi aukciók során is megmarad-e ez a kapcsolat. Erre $\chi^2$-teszt ad választ, melynek null-hipotézise, hogy a Cramer-együttható 0. A p-érték bármely küszöbnél kisebb, ezért a kapcsolat szignifikáns is.
+
+```{r}
+
+kmeans_plot$Period <- bond5$Period
+ggplot(data = kmeans_plot, aes(x=Period)) +
+  geom_bar(aes(fill=cluster), position = 'fill') +
+  scale_fill_brewer(palette="Dark2")
+cramerV(kmeans_plot$Period, kmeans_plot$cluster)
+chisq.test(table(kmeans_plot[,c("Period", "cluster")]))
+```
+
+# 4. A hozamot meghatározó tényezők
 
 
 ## Korreláció
@@ -306,62 +371,39 @@ Nem meglepő a meghirdetett és elfogadott mennyiségek közötti erős korrelá
 print(cor(bond5numeric), digits = 1)
 corPlot(bond5numeric, FALSE)
 
-cor.test(bond5numeric$Yield, bond5numeric$Accepted)
+
 ```
+
+## Kollinearitás ellenőrzése
+
+```{r condi}
+X <- as.matrix(dplyr::select(bond5numeric,-Yield))
+
+qr(t(X)%*%X)$rank == min(dim(t(X)%*%X))
+
+lambda <- eigen(t(X) %*% X)$values
+print(paste('Condition number:', max(lambda) / min(lambda))) # -> meg sem próbálom invertálni
+
+```
+
+# TODO 
+
+\newpage
+------------------------------
+\newpage
+-------------------------
+
+# TODO 
+
+
+
+
+# 3. Átlaghozam és elfogadott mennyiség kapcsolata
+
 
 ## Átlaghozam vs elfogadott mennyiség
 
 
-Az Államadósság kezelő által befolyásolható mennyiség hozam és az elfogadott mennyiség. Mint korábban láttuk a kettő között gyenge negatív korreláció van.
-<!-- Ideális esetben miután 11 óra körül beérkeztek az ajánlatok, a legmagasabb árfolyamtól kezdve fogadja el az ajánlatokat a stratégiája által meghatározott mértékig, amivel az átlagos árfolyam csökken, az átlagos hozam pedig nő. -->
-
-```{r y.vs.acc}
-ggplot(bond5, aes(Yield, Accepted)) +
-  geom_point() +
-  geom_density2d() +
-  geom_density2d_filled(alpha=0.5)
-```
-
-## kmeans
-
-A pontok 3 csoportba tömörülnek. Ezt a három csoportot knn módszerrel próbálom szétválasztani, majd összevetem egy eddig nem használt változóval, az időszakkal.
-
-A 2000 évekre a magas hozamok voltak jellemzőek, a 2010-es években megjeltek az alacsonyabb hozamok. A 2020-as éveknek csak az elején vagyunk, ezért nem hasonlítanám a másik kettőhöz. A legalsó grafikonon látszik, hogy a 2008-9-es válság után láthatóan megváltozott az ÁKK stratégiája. Nagyobb kibocsátások helyett a jobban kontrollálható és kisebb kockázatot jelentő módon gyakrabban, de kisebb összegeket hirdet meg.
-
-```{r kmeans}
-k <- kmeans(scale(bond5numeric), centers=3)
-kmeans_plot <- bond5numeric
-kmeans_plot$cluster <- as.factor(k$cluster)
-
-ggplot(kmeans_plot, aes(x=Yield, y=Accepted)) +
-  geom_point(aes(colour=factor(cluster)))
-
-
-kmeans_plot$Period <- bond5$Period
-ggplot(data = kmeans_plot, aes(x=Period)) +
-  geom_bar(aes(fill=cluster), position = 'fill') +
-  scale_fill_brewer(palette="Dark2")
-  
-  
-
-# pc <- prcomp(t(scale(bond5numeric)))
-# pc <- cbind(pc$rotation[,1], pc$rotation[,2], kmeans_plot$kmeans)
-# pc.df <- data.frame(pc$rotation[,1], pc$rotation[,2], kmeans_plot$kmeans)
-# 
-# plot(pc.df[,1], pc.df[,2], col=pc.df[,3])
-# plot(pc[,1], pc[,2], col=pc[,3])
-# ggplot(data.frame(pc$rotation), aes(x=PC1, y=PC3)) +
-#   geom_point()
-ggplot(bond5, aes(x=Date, y=Accepted)) +
-  geom_point() +
-  labs(title = "Issued ammounts during time")
-
-head(kmeans_plot)
-cramerV(kmeans_plot$Period, kmeans_plot$cluster)
-
-
-
-```
 
 
 ## PCA
@@ -382,14 +424,7 @@ magas R^2>0.9 tautológia gyanús
 
 Tudjuk, hogy változók között erős korrelációk vannak, ezért a mRMR és forward módszerrel próbálom kiválasztani a szükségeseket. Jelen esetben a forward módszer módszer ad jobb eredményt, amit a két AIC érték viszonyából látunk.
 
-```{r condi}
-X <- as.matrix(dplyr::select(bond5numeric,-Yield))
-qr(t(A)%*%A)$rank == min(dim(t(A)%*%A))
 
-lambda <- eigen(t(X) %*% X)$values
-print(paste('Condition number:', max(lambda) / min(lambda))) # -> meg sem próbálom invertálni
-
-```
 ```{r select.fwd}
 
 
@@ -432,12 +467,7 @@ AIC(lm.mrmr)
 ##########
 \newpage
 
-```{r}
 
-# install.packages("questionr") # Cramer
-# install.packages("lawstat") # levene.test
-
-```
 
 
 \newpage
@@ -542,25 +572,5 @@ sprintf("2010-2019-es időszak hozamainak szórása: %s",
 A Kolmogorov-Smirnov-teszt szerint a p-érték lényegében 0, ezért a null-hipotézist el kell vetnünk, vagyis az első időszakban a hozamok nem normális eloszlásúak. Az azonos szórás feltétele is sérül. Ezek miatt a korábban számított p-érték nem megbízható.
 
 
-## Két mennyiségi változó kapcsolata
-
-Utolsó vizsgálat tárgya a kötvények mennyiségének és hozamának kapcsolata
-
-```{r echo=FALSE}
-ggplot(data=bond5, aes(x=Accepted, y=Yield)) +
-  geom_point() +
-  geom_line()+
-  labs("",
-       x="Accepted",
-       y="Yield")
-```
-```{r echo=FALSE}
-sprintf("A két változó közötti korreláció: %s",
-        cor(bond5$Accepted, bond5$Yield))
-(reg <- lm(Yield ~ Accepted, bond5))
-summary(reg)
-```
 
 
-
-A korreláció negatív és abszolút értéke kisebb 0.3-nál. A kapcsolat ellentétes, de gyenge. Nagyobb kereslethez magasabb ár tartozik, a kötvény ára és hozama között monoton csökkenő kapcsolat van. A p-érték 0.0004 1%-nál is kisebb, ezért elvetjük, hogy az egyenes meredeksége 0, így a kapcsolat szignifikáns.
