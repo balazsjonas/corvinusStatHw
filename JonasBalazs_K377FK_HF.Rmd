@@ -24,6 +24,7 @@ pacman::p_load(ggplot2,
                rcompanion, #groupwiseMean, cramerV
                MASS, # stepAIC
                mRMRe, # mRMR.data
+               glmnet, # ridge
                readxl # read_excel
                )
 ```
@@ -376,14 +377,131 @@ corPlot(bond5numeric, FALSE)
 
 ## Kollinearitás ellenőrzése
 
+A korrelációk alapján nem nem lepő, hogy van multikollinearitás a prediktor változók között. Ennek egyik előzetes jele, hogy a regresszorok mátrixa nem teljes rangú. A másik pedig, hogy a kondiciószáma nagy, emiatt a megoldás relatív hibája használhatatlanul nagy.
 ```{r condi}
 X <- as.matrix(dplyr::select(bond5numeric,-Yield))
 
 qr(t(X)%*%X)$rank == min(dim(t(X)%*%X))
 
 lambda <- eigen(t(X) %*% X)$values
-print(paste('Condition number:', max(lambda) / min(lambda))) # -> meg sem próbálom invertálni
+print(paste('Condition number:', max(lambda) / min(lambda)))
+# meg sem próbálom invertálni
 
+```
+
+## Változószelekció
+
+Tudjuk, hogy változók között erős korrelációk vannak, ezért a mRMR és forward módszerrel próbálom kiválasztani a szükségeseket.
+
+### Forward módszer 1. próbálkozás
+
+Az első próbálkozás forward módszernek indult, de nem tagadom trial and error lett belőle, csak történeti okból hagyom benne. A $R^2$ együttható 1, ami nem meglepő, ha azok a változók kerültek a regresszorok közé, mivel a független változó korrelációja 1.
+
+```{r select.fwd.1}
+lm.min <- lm(Yield ~ 1, data=bond5numeric)
+print(lm.min)
+
+lm.fwd.1 <- stepAIC(lm.min,
+                  direction = "forward",
+                  trace = TRUE,
+                  scope=list(lower=lm.min,
+                             upper=~ Accepted + Announced + BidAmount +
+                               AvgPrice +MinPrice+MaxPrice +
+                               MinYield + MaxYield +
+                               YieldSpread))
+summary(lm.fwd.1)
+names(lm.fwd.1$coefficients)
+
+```
+
+<!-- A továbbiakban csak azokat hagyom -->
+```{r select.fwd.2}
+
+bond5subset <- dplyr::select(bond5numeric, -MinYield, -MaxYield,
+                             -MinPrice, -AvgPrice, -MaxPrice)
+colnames(bond5subset)
+lm.min <- lm(Yield ~ 1, data=bond5subset)
+print(lm.min)
+
+lm.fwd <- stepAIC(lm.min,
+                  direction = "forward",
+                  trace = TRUE,
+                  scope=list(lower=lm.min,
+                             upper=~ Accepted + Announced + BidAmount +
+                               # AvgPrice +MinPrice+MaxPrice +
+                               # MinYield + MaxYield +
+                               YieldSpread))
+summary(lm.fwd)
+
+
+```
+
+
+
+```{R select.mrmr, eval=FALSE, include=FALSE}
+# Az mRMR módszer ugyanazt az eredményt adná
+bond5mrmr <- mRMR.data(bond5subset)
+x<-solutions(mRMR.classic(data = bond5mrmr,
+                          target_indices = c(1),
+                          feature_count = 5))
+colnames(bond5subset)[x[[1]]]
+
+lm.mrmr <- lm(Yield ~ YieldSpread + Accepted + BidAmount + Announced,
+              data=bond5numeric)
+summary(lm.mrmr)
+
+```
+
+Az AIC értékeken az látszik, hogy amint elhagyom a determinisztikus (árfolyamok) és erősen korreláló tagokat az illeszkedés kevésbé pontos.
+
+```{R selection.comp}
+AIC(lm.fwd.1)
+AIC(lm.fwd)
+```
+
+## Ridge
+
+```{R ridge}
+
+
+
+X <- as.matrix(dplyr::select(bond5numeric,-Yield))
+Y <- as.matrix(dplyr::select(bond5numeric, Yield))
+# ridge<-glmnet(X, Y, alpha=0, family = 'gaussian')
+# plot(ridge, label = TRUE, xvar = "lambda")
+
+ridge.fit <- cv.glmnet(X, Y, type.measure = "mse", alpha=0, family='gaussian')
+plot(ridge.fit)
+
+
+```
+
+## Összehasonlítás
+
+```{R aic}
+rse <- function(residuals, df) {
+  k <- df -1
+  SSE <- sum(residuals^2)
+  n <- length(residuals)
+  result <- sqrt(SSE / (n-k-1))
+  result
+}
+aic <- function(residuals, df) {
+  result <- 2 * df + length(residuals) * log(rse(residuals, df))
+}
+
+ridge.predited <- predict(ridge.fit, s=alpha0.fit$lambda.min, X)
+ridge.residuals <- Y - alpha0.predited
+
+
+print(aic(lm.fwd$residuals, length(lm.fwd$coefficients)))
+print(aic(lm.fwd.1$residuals, length(lm.fwd.1$coefficients)))
+print(aic(ridge.residuals, ncol(X)+1)) # +1 lambdának
+
+
+print(rse(lm.fwd$residuals, length(lm.fwd$coefficients)))
+print(rse(lm.fwd.1$residuals, length(lm.fwd.1$coefficients)))
+print(rse(ridge.residuals, ncol(X)+1)) # +1 lambdának
 ```
 
 # TODO 
@@ -398,17 +516,11 @@ print(paste('Condition number:', max(lambda) / min(lambda))) # -> meg sem prób�
 
 
 
-# 3. Átlaghozam és elfogadott mennyiség kapcsolata
-
-
-## Átlaghozam vs elfogadott mennyiség
-
 
 
 
 ## PCA
 
-### TODO megfelelő mérték
 
 ### LASSO és hasonlók
 
@@ -416,47 +528,14 @@ print(paste('Condition number:', max(lambda) / min(lambda))) # -> meg sem prób�
 
 ## Lineáris regresszió
 
-### TODO multikollenaritás ellenőrzése, 
+
 
 ### változószelekció --> X mátrix rangja!!!
 
 magas R^2>0.9 tautológia gyanús
 
-Tudjuk, hogy változók között erős korrelációk vannak, ezért a mRMR és forward módszerrel próbálom kiválasztani a szükségeseket. Jelen esetben a forward módszer módszer ad jobb eredményt, amit a két AIC érték viszonyából látunk.
 
 
-```{r select.fwd}
-
-
-lm.min <- lm(Yield ~ 1, data=bond5numeric)
-print(lm.min)
-AIC(lm.min)
-lm.fwd <- stepAIC(lm.min,
-                  direction = "forward",
-                  trace = TRUE,
-                  scope=list(lower=lm.min,
-                             upper=~ Accepted + Announced + BidAmount +
-                               AvgPrice +MinPrice+MaxPrice +
-                               MinYield + MaxYield +
-                               YieldSpread))
-summary(lm.fwd)
-
-```
-
-```{R select.mrmr}
-bond5mrmr <- mRMR.data(bond5numeric)
-x<-solutions(mRMR.classic(data = bond5mrmr,
-                          target_indices = c(1),
-                          feature_count = 5))
-colnames(bond5numeric)[x[[1]]]
-
-lm.mrmr <- lm(Yield ~ MaxYield + MinYield + YieldSpread + MaxPrice + Accepted,
-              data=bond5numeric)
-summary(lm.mrmr)
-
-AIC(lm.fwd)
-AIC(lm.mrmr)
-```
 
 
 
@@ -486,17 +565,7 @@ Az első részben bemutatom az adat forrását és ismérveit. A második részb
 A hozamok vizsgálatakor csak a sikeres aukciókat érdemes figyelembe venni, amit az elfogadott mennyiség alapján lehet kiszűrni. Az 5 éves kötvény esetén ez megegyezik azzal a feltétellel, hogy az átlaghozam pozitív, de bízzunk benne, hogy egyszer nekünk is sikerül 0%-os hozammal forrást bevonni az 5 éves lejáraton. 
 <!-- Jelenleg a német 5 éves hozam -0.4%  -->
 
-```{r message=FALSE, include=FALSE}
-bond5successful <- bond5[bond5$AcceptedAmount>0, ]
-```
-```{r echo=FALSE, message=TRUE}
-ggplot(data=remove_missing(bond5successful, na.rm=TRUE, vars="Yield"),
-       aes(y=Yield, x=Period)) +
-  geom_boxplot() +
-  labs(title="5 éves kötvények hozama",
-       x="Időszak",
-       y="Hozam (%)")
-```
+
 
 
 ## Lejáratok aránya különböző időszakokban
