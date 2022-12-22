@@ -118,7 +118,7 @@ A Tenor változóban kötvény tipusától függően különböző jelölést ha
 Hozamok és árfolyamok csak akkor értelmezhetőek, ha az elfogadott mennyiség pozitív, azaz sikeres volt az aukció. A sikertelen aukciókat a hozamok vizsgálatakor kiszűrtem.
 
 <!-- Fel nem használt ismérvek -->
-A "Pro-rata (%)", "Bid pcs", "Accepted pcs" ismérvek pontos definícióját nem találtam meg. Bár az "ISIN" számít az értékpapír azonosítójának, nem lesz szükség rá. A további oszlopok a csereaukciók során felajánlott értékpapírok.
+A "Pro-rata (%)", "Bid pcs", "Accepted pcs" ismérvek pontos definícióját nem találtam meg. Bár az "ISIN" számít az értékpapír azonosítójának, nem lesz szükség rá. A további oszlop a csereaukciók során felajánlott értékpapírok adatait tartalmazza.
 
 
 ## Szűrések
@@ -320,17 +320,6 @@ ggplot(kmeans_plot, aes(x=Yield, y=Accepted)) +
   geom_point(aes(colour=factor(cluster)))
 
 
-  
-  
-
-# pc <- prcomp(t(scale(bond5numeric)))
-# pc <- cbind(pc$rotation[,1], pc$rotation[,2], kmeans_plot$kmeans)
-# pc.df <- data.frame(pc$rotation[,1], pc$rotation[,2], kmeans_plot$kmeans)
-# 
-# plot(pc.df[,1], pc.df[,2], col=pc.df[,3])
-# plot(pc[,1], pc[,2], col=pc[,3])
-# ggplot(data.frame(pc$rotation), aes(x=PC1, y=PC3)) +
-#   geom_point()
 ggplot(bond5, aes(x=Date, y=Accepted)) +
   geom_point() +
   labs(title = "Issued ammounts during time")
@@ -341,11 +330,15 @@ head(kmeans_plot)
 
 ```
 
-Felmerült bennem az a lehetőség, hogy a k-means algoritmus által "megtalált" csoportok időszakonként megváltoztak. A két kategórikus változó vizsgálatára a Cramer-V együttható ad megoldást. Az értéke 0.58, ami közepesen erős kapcsolatra utal. További kérdés, hogy a "sokaságban", vagyis a későbbi aukciók során is megmarad-e ez a kapcsolat. Erre $\chi^2$-teszt ad választ, melynek null-hipotézise, hogy a Cramer-együttható 0. A p-érték bármely küszöbnél kisebb, ezért a kapcsolat szignifikáns is.
+```{r cramer1, include=FALSE}
+kmeans_plot$Period <- bond5$Period
+bond5.cramer <- cramerV(kmeans_plot$Period, kmeans_plot$cluster)
+```
+Felmerült bennem az a lehetőség, hogy a k-means algoritmus által "megtalált" csoportok időszakonként megváltoztak. A két kategórikus változó vizsgálatára a Cramer-V együttható ad megoldást. Az értéke `r bond5.cramer`, ami közepesen erős kapcsolatra utal. További kérdés, hogy a "sokaságban", vagyis a későbbi aukciók során is megmarad-e ez a kapcsolat. Erre $\chi^2$-teszt ad választ, melynek null-hipotézise, hogy a Cramer-együttható 0. A p-érték bármely küszöbnél kisebb, ezért a kapcsolat szignifikáns is.
 
 ```{r}
 
-kmeans_plot$Period <- bond5$Period
+
 ggplot(data = kmeans_plot, aes(x=Period)) +
   geom_bar(aes(fill=cluster), position = 'fill') +
   scale_fill_brewer(palette="Dark2")
@@ -377,7 +370,7 @@ corPlot(bond5numeric, FALSE)
 
 ## Kollinearitás ellenőrzése
 
-A korrelációk alapján nem nem lepő, hogy van multikollinearitás a prediktor változók között. Ennek egyik előzetes jele, hogy a regresszorok mátrixa nem teljes rangú. A másik pedig, hogy a kondiciószáma nagy, emiatt a megoldás relatív hibája használhatatlanul nagy.
+A korrelációk alapján nem meglepő az sem, hogy van multikollinearitás a prediktor változók között. Ennek egyik előzetes jele, hogy a regresszorok mátrixa nem teljes rangú. A másik pedig, hogy a kondiciószáma nagy, emiatt a megoldás relatív hibája használhatatlanul nagy.
 ```{r condi}
 X <- as.matrix(dplyr::select(bond5numeric,-Yield))
 
@@ -415,23 +408,23 @@ names(lm.fwd.1$coefficients)
 ```
 
 <!-- A továbbiakban csak azokat hagyom -->
-```{r select.fwd.2}
+```{r select.fwd.lmt}
 
-bond5subset <- dplyr::select(bond5numeric, -MinYield, -MaxYield,
+bond5limited <- dplyr::select(bond5numeric, -MinYield, -MaxYield,
                              -MinPrice, -AvgPrice, -MaxPrice)
-colnames(bond5subset)
-lm.min <- lm(Yield ~ 1, data=bond5subset)
+colnames(bond5limited)
+lm.min <- lm(Yield ~ 1, data=bond5limited)
 print(lm.min)
 
-lm.fwd <- stepAIC(lm.min,
-                  direction = "forward",
-                  trace = TRUE,
-                  scope=list(lower=lm.min,
-                             upper=~ Accepted + Announced + BidAmount +
-                               # AvgPrice +MinPrice+MaxPrice +
-                               # MinYield + MaxYield +
-                               YieldSpread))
-summary(lm.fwd)
+lm.fwd.limited <- stepAIC(lm.min,
+                          direction = "forward",
+                          trace = TRUE,
+                          scope=list(lower=lm.min,
+                                     upper=~ Accepted + Announced + BidAmount +
+                                       # AvgPrice +MinPrice+MaxPrice +
+                                       # MinYield + MaxYield +
+                                       YieldSpread))
+summary(lm.fwd.limited)
 
 
 ```
@@ -440,14 +433,14 @@ summary(lm.fwd)
 
 ```{R select.mrmr, eval=FALSE, include=FALSE}
 # Az mRMR módszer ugyanazt az eredményt adná
-bond5mrmr <- mRMR.data(bond5subset)
+bond5mrmr <- mRMR.data(bond5limited)
 x<-solutions(mRMR.classic(data = bond5mrmr,
                           target_indices = c(1),
                           feature_count = 5))
-colnames(bond5subset)[x[[1]]]
+colnames(bond5limited)[x[[1]]]
 
 lm.mrmr <- lm(Yield ~ YieldSpread + Accepted + BidAmount + Announced,
-              data=bond5numeric)
+              data=bond5limited)
 summary(lm.mrmr)
 
 ```
@@ -456,190 +449,83 @@ Az AIC értékeken az látszik, hogy amint elhagyom a determinisztikus (árfolya
 
 ```{R selection.comp}
 AIC(lm.fwd.1)
-AIC(lm.fwd)
+AIC(lm.fwd.limited)
 ```
 
 ## Ridge
 
+A következő példában nem zárunk ki változót. A ridge regresszió feltételezi, hogy a változók sztenderdizáltak, de a glmnet alapbeállítás szerint ezt elvégzi.
 ```{R ridge}
-
-
 
 X <- as.matrix(dplyr::select(bond5numeric,-Yield))
 Y <- as.matrix(dplyr::select(bond5numeric, Yield))
-# ridge<-glmnet(X, Y, alpha=0, family = 'gaussian')
-# plot(ridge, label = TRUE, xvar = "lambda")
 
 ridge.fit <- cv.glmnet(X, Y, type.measure = "mse", alpha=0, family='gaussian')
 plot(ridge.fit)
-
-
 ```
 
-## Összehasonlítás
+## Lineáris regresszió és ridge eredményeinek összehasonlítása
+
+Ahhoz, hogy az AIC érték összehasonlítható legyen, azokat a konstansokat, amik minden modellben azonosak, elhagytam:
+$$
+AIC = 2 k + nrow(data) * ln(RSS)
+$$
+
 
 ```{R aic}
-rse <- function(residuals, df) {
-  k <- df -1
+rse <- function(residuals, n.params) {
+  # source: https://www.statology.org/residual-standard-error-r/
+  k <- n.params - 1
   SSE <- sum(residuals^2)
   n <- length(residuals)
   result <- sqrt(SSE / (n-k-1))
   result
 }
-aic <- function(residuals, df) {
-  result <- 2 * df + length(residuals) * log(rse(residuals, df))
+aic <- function(residuals, n.params) {
+  # https://en.wikipedia.org/wiki/Akaike_information_criterion
+  result <- 2 * n.params + length(residuals) * log(rse(residuals, n.params))
+  result
+}
+r.squared <- function(residuals, expected, n.params) {
+  RSS <- sum(residuals^2)
+  TSS <- sum((expected - mean(expected))^2)
+  R2 <- 1 - RSS / TSS
+  df.res <- length(residuals) - n.params
+  df.tot <- length(residuals) - 1
+  result <- 1 - RSS/df.res / (TSS/df.tot)
+  result
 }
 
-ridge.predited <- predict(ridge.fit, s=alpha0.fit$lambda.min, X)
-ridge.residuals <- Y - alpha0.predited
-
-
-print(aic(lm.fwd$residuals, length(lm.fwd$coefficients)))
-print(aic(lm.fwd.1$residuals, length(lm.fwd.1$coefficients)))
-print(aic(ridge.residuals, ncol(X)+1)) # +1 lambdának
-
-
-print(rse(lm.fwd$residuals, length(lm.fwd$coefficients)))
-print(rse(lm.fwd.1$residuals, length(lm.fwd.1$coefficients)))
-print(rse(ridge.residuals, ncol(X)+1)) # +1 lambdának
+print(ridge.fit$lambda.min)
+ridge.predicted <- predict(ridge.fit, s=ridge.fit$lambda.min, X)
+ridge.residuals <- Y - ridge.predicted
 ```
 
-# TODO 
+A forward módszerhez képest mind az átlagos négyzetes hiba, mind az AIC alapján jobban teljesít a ridge módszer. Meg kell jegyezni, hogy a $R^2$ még továbbra is nagyon magas. A *glmnet* cross validation függvénye az átlagos négyzetes hibát minimalizálta, amit viszonylag alacsony $\lambda$-val ért el, vagyis kicsit tért csak el lineáris regresszióhoz képest.
 
-\newpage
-------------------------------
-\newpage
--------------------------
-
-# TODO 
-
-
-
-
-
-
-
-## PCA
-
-
-### LASSO és hasonlók
-
-
-
-## Lineáris regresszió
-
-
-
-### változószelekció --> X mátrix rangja!!!
-
-magas R^2>0.9 tautológia gyanús
+\begin{center}
+\begin{tabular}{||c c c c||}
+\hline
+Módszer & RSE & AIC & adj. $R^2$\\
+\hline\hline
+Forward (összes változóval indítva) &
+`r rse(lm.fwd.1$residuals, length(lm.fwd.1$coefficients))` &
+`r aic(lm.fwd.1$residuals, length(lm.fwd.1$coefficients))` &
+`r r.squared(lm.fwd.1$residuals, Y, length(lm.fwd.1$coefficients)) # az elvárt érték minden esetben ugyanaz`\\
+\hline
+Forward (limitált változókkal) &
+`r rse(lm.fwd.limited$residuals, length(lm.fwd.limited$coefficients))` &
+`r aic(lm.fwd.limited$residuals, length(lm.fwd.limited$coefficients))` &
+`r r.squared(lm.fwd.limited$residuals, Y, length(lm.fwd.limited$coefficients))`\\
+\hline
+Ridge &
+`r rse(ridge.residuals, ncol(X)+1) # +1 a lambdának` &
+`r aic(ridge.residuals, ncol(X)+1) # +1 a lambdának` &
+`r r.squared(ridge.residuals, Y, ncol(X)+1)`\\
+\hline
+\hline
 
 
-
-
-
-
-# TODO: Kilógó értékek, Winsorizált átlag, HuberM
-
-#  TODO  ###################x
-\newpage
-##########
-\newpage
-
-
-
-
-\newpage
-------------------------------
-\newpage
-#################
-\newpage
-# Probléma felvetése
-
-Célom a magyar államkötvények első forgalomba hozatalának vizsgálata. 
-
-Az első részben bemutatom az adat forrását és ismérveit. A második részben az 5 éves lejárat aukcióinak forgalmi adatait és az különböző lejáratok gyakoriságát vizsgáltam. A harmadik részben másik változót, a kötvény kibocsátáskori hozamát vizsgáltam, valamint ennek változását az elmúlt évtizedekben. Az 5 éves lejárat aukcióinak forgalmi és hozam adatait vizsgáltam. A negyedik részben két egymintás hipotézis vizsgálatot mutatok be. Az ötödik részben több változó kapcsolatát vizsgáltam. Az első példa két mennyiségi változó (lejárat és időszak). A második az időszak és hozam kapcsolatáról szól, a harmadik pedig a már külön vizsgált hozam és kibocsátott mennyiség viszonyát mutatja be.
-
-# 3. Az 5 éves államkötvények hozamának vizsgálata az időszak függvényében
-
-A hozamok vizsgálatakor csak a sikeres aukciókat érdemes figyelembe venni, amit az elfogadott mennyiség alapján lehet kiszűrni. Az 5 éves kötvény esetén ez megegyezik azzal a feltétellel, hogy az átlaghozam pozitív, de bízzunk benne, hogy egyszer nekünk is sikerül 0%-os hozammal forrást bevonni az 5 éves lejáraton. 
-<!-- Jelenleg a német 5 éves hozam -0.4%  -->
-
-
-
-
-## Lejáratok aránya különböző időszakokban
-
-
-
-Az alábbi ábrán a kibocsátott kötvények mennyisége látható az idő függvényében. 2009 körül startégiaváltás vehető észre: gyakoribb aukciók során kisebb mennyiségek kibocsátása. Ezzel valószínűleg jobban kontrollálható a kockázat és költség.
-
-
-```{r echo=FALSE}
-ggplot(data=bond5, aes(x=Date, y=Accepted)) +
-  geom_point()+
-  labs(title = "accepted vs time",
-       x="Date",
-       y="Accepted (bn.)")
-```
-
-
-
-
-# 5. Kétváltozós kapcsoslatvizsgálat
-
-## Időszak és lejárat kapcsolata
-
-```{r echo=TRUE, warning=FALSE}
-ggplot(data=subset(issues,issues$`Accepted (mln)`> 0 ), 
-       aes(x=Period, fill =Tenor)) +
-  geom_bar(position="fill") +
-  scale_fill_brewer(palette="Dark2") +
-  labs(title="Ratio of tenors",
-       x="Ratio (%)",
-       y="Period")
-```
-
-Az 5 és 10 éves lejáratok aránya emelkedett a három időszak folyamán, míg a 3 hónapos és 1 éves kötvények aránya jelentősen nem változott. Néhány évre bevezetésre került a 20 éves referencia kötvény is.
-
-```{r warning=FALSE}
-# cramer.v(table(issues[issues$`Accepted (mln)`>0,c("Period", "Tenor")]))
-```
-
-A Cramer-együttható értéke 0.2882, a kapcsolat gyenge.
-
-További kérdés, hogy a "sokaságban", vagyis a későbbi aukciók során is megmarad ez a gyenge kapcsolat, 
-
-``` {r warning=FALSE, echo=TRUE}
-chisq.test(table(issues[issues$`Accepted (mln)`>0,c("Period", "Tenor")]))
-```
-A p-érték lényegében 0-nak tekinthető, ezért semmilyen alfa érték mellett nem tudjuk elvetni H1-et, vagyis a kapcsolat gyenge, de szignifikáns.
-
-
-## Időszak és hozam kapcsolata
-
-```{r echo=FALSE}
-aov(Yield ~ Period, data=bond5[bond5$Accepted>0,])
-sprintf("Between: %s", 2143.8)
-sprintf("Residuals: %s", 1672.6)
-sprintf("H2: %s", 2143.8/ (2143.8 + 1672.6))
-```
-
-A variancia-hányados 56.2%, a p-érték lényegében 0, kisebb 1% alfánál is, így H0 elutasítható, így a időszak és hozam kapcsolata erős és szignifikáns.
-
-Feltételek ellenőrzése:
-```{r echo=TRUE, warning=FALSE}
-ks.test(bond5[bond5$Accepted>0 & bond5$Period=="2000 - 2009",]$Yield, "pnorm")
-```
-```{r echo=FALSE}
-sprintf("2000-2009-es időszak hozamainak szórása: %s",
-        sd(bond5[bond5$Accepted>0 & bond5$Period=="2000 - 2009",]$Yield))
-sprintf("2010-2019-es időszak hozamainak szórása: %s",
-        sd(bond5[bond5$Accepted>0 & bond5$Period=="2010 - 2019",]$Yield))
-
-```
-A Kolmogorov-Smirnov-teszt szerint a p-érték lényegében 0, ezért a null-hipotézist el kell vetnünk, vagyis az első időszakban a hozamok nem normális eloszlásúak. Az azonos szórás feltétele is sérül. Ezek miatt a korábban számított p-érték nem megbízható.
-
-
-
+\end{tabular}
+\end{center}
 
