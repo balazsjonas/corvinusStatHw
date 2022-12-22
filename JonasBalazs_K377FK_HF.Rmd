@@ -237,13 +237,7 @@ ggplot(data=bond5, aes(x=Yield)) +
   labs(title = "Average yield of 5-year bonds at issue",
        x = "Average yield (%)"
        )
-  
-# 
-# ggplot(data=bond5, aes(x=Yield)) +
-#   geom_density(bw=0.1) +
-#   labs(title="Kernel density becslő (bw=0.1)",
-#        x="Átlaghozam (%)",
-#        y= "Relatív gyakoriság")
+
 ```
 
 
@@ -394,7 +388,7 @@ Az első próbálkozás forward módszernek indult, de nem tagadom trial and err
 lm.min <- lm(Yield ~ 1, data=bond5numeric)
 print(lm.min)
 
-lm.fwd.1 <- stepAIC(lm.min,
+lm.fwd.all <- stepAIC(lm.min,
                   direction = "forward",
                   trace = TRUE,
                   scope=list(lower=lm.min,
@@ -402,12 +396,13 @@ lm.fwd.1 <- stepAIC(lm.min,
                                AvgPrice +MinPrice+MaxPrice +
                                MinYield + MaxYield +
                                YieldSpread))
-summary(lm.fwd.1)
-names(lm.fwd.1$coefficients)
+summary(lm.fwd.all)
+names(lm.fwd.all$coefficients)
 
 ```
 
-<!-- A továbbiakban csak azokat hagyom -->
+A továbbiakban csak azokat hagyom a változók között, amik nincsenek determinisztikus vagy más erős kapcsolatban a független változóval.
+
 ```{r select.fwd.lmt}
 
 bond5limited <- dplyr::select(bond5numeric, -MinYield, -MaxYield,
@@ -445,10 +440,10 @@ summary(lm.mrmr)
 
 ```
 
-Az AIC értékeken az látszik, hogy amint elhagyom a determinisztikus (árfolyamok) és erősen korreláló tagokat az illeszkedés kevésbé pontos.
+Az AIC értékeken az látszik, hogy amint elhagyom a determinisztikus (árfolyamok) és erősen korreláló tagokat az illeszkedés kevésbé pontos. Az mRMR ugyanerre az eredményre vezetne.
 
 ```{R selection.comp}
-AIC(lm.fwd.1)
+AIC(lm.fwd.all)
 AIC(lm.fwd.limited)
 ```
 
@@ -501,7 +496,7 @@ ridge.predicted <- predict(ridge.fit, s=ridge.fit$lambda.min, X)
 ridge.residuals <- Y - ridge.predicted
 ```
 
-A forward módszerhez képest mind az átlagos négyzetes hiba, mind az AIC alapján jobban teljesít a ridge módszer. Meg kell jegyezni, hogy a $R^2$ még továbbra is nagyon magas. A *glmnet* cross validation függvénye az átlagos négyzetes hibát minimalizálta, amit viszonylag alacsony $\lambda$-val ért el, vagyis kicsit tért csak el lineáris regresszióhoz képest.
+A forward módszerhez képest mind az átlagos négyzetes hiba, mind az AIC alapján jobban teljesít a ridge módszer. Meg kell jegyezni, hogy a $R^2$ még továbbra is nagyon magas. A *glmnet* cross validation függvénye az átlagos négyzetes hibát minimalizálta, amit viszonylag alacsony $\lambda$-val ért el (pl a $X'X$ mátrix normájához képest, ami `r norm(t(X)%*%X)`), vagyis kicsit tért csak el lineáris regresszióhoz képest.
 
 \begin{center}
 \begin{tabular}{||c c c c||}
@@ -509,9 +504,9 @@ A forward módszerhez képest mind az átlagos négyzetes hiba, mind az AIC alap
 Módszer & RSE & AIC & adj. $R^2$\\
 \hline\hline
 Forward (összes változóval indítva) &
-`r rse(lm.fwd.1$residuals, length(lm.fwd.1$coefficients))` &
-`r aic(lm.fwd.1$residuals, length(lm.fwd.1$coefficients))` &
-`r r.squared(lm.fwd.1$residuals, Y, length(lm.fwd.1$coefficients)) # az elvárt érték minden esetben ugyanaz`\\
+`r rse(lm.fwd.all$residuals, length(lm.fwd.all$coefficients))` &
+`r aic(lm.fwd.all$residuals, length(lm.fwd.all$coefficients))` &
+`r r.squared(lm.fwd.all$residuals, Y, length(lm.fwd.all$coefficients)) # az elvárt érték minden esetben ugyanaz`\\
 \hline
 Forward (limitált változókkal) &
 `r rse(lm.fwd.limited$residuals, length(lm.fwd.limited$coefficients))` &
